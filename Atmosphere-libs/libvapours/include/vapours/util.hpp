@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) 2018-2020 Atmosphère-NX
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+#include <vapours/common.hpp>
+#include <vapours/assert.hpp>
+
+#include <vapours/util/util_alignment.hpp>
+#include <vapours/util/util_size.hpp>
+#include <vapours/util/util_endian.hpp>
+#include <vapours/util/util_scope_guard.hpp>
+#include <vapours/util/util_specialization_of.hpp>
+#include <vapours/util/util_bitpack.hpp>
+#include <vapours/util/util_bitset.hpp>
+#include <vapours/util/util_bitutil.hpp>
+#include <vapours/util/util_typed_storage.hpp>
+#include <vapours/util/util_fourcc.hpp>
+#include <vapours/util/util_intrusive_list.hpp>
+#include <vapours/util/util_intrusive_red_black_tree.hpp>
+#include <vapours/util/util_tinymt.hpp>
+#include <vapours/util/util_uuid.hpp>
+#include <vapours/util/util_bounded_map.hpp>
