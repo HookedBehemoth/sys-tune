@@ -10,19 +10,19 @@ namespace ams::music {
             GetStatus = 0,
             SetStatus = 1,
             GetQueueCount = 2,
-            AddToQueue = 3,
-            GetNext = 4,
-            GetLast = 5,
-            Clear = 6,
+            GetCurrent = 3,
+            GetList = 4,
+            AddToQueue = 10,
+            Clear = 11,
         };
 
       public:
         virtual Result GetStatus(sf::Out<PlayerStatus> out);
         virtual Result SetStatus(PlayerStatus status);
         virtual Result GetQueueCount(sf::Out<u32> out);
+        virtual Result GetCurrent(sf::OutBuffer out_path);
+        virtual Result GetList(sf::OutBuffer out_path, sf::Out<u32> out);
         virtual Result AddToQueue(sf::InBuffer path);
-        virtual Result GetNext(sf::OutBuffer out_path);
-        virtual Result GetLast(sf::OutBuffer out_path);
         virtual Result Clear();
 
       public:
@@ -30,9 +30,9 @@ namespace ams::music {
             MAKE_SERVICE_COMMAND_META(GetStatus),
             MAKE_SERVICE_COMMAND_META(SetStatus),
             MAKE_SERVICE_COMMAND_META(GetQueueCount),
+            MAKE_SERVICE_COMMAND_META(GetCurrent),
+            MAKE_SERVICE_COMMAND_META(GetList),
             MAKE_SERVICE_COMMAND_META(AddToQueue),
-            MAKE_SERVICE_COMMAND_META(GetNext),
-            MAKE_SERVICE_COMMAND_META(GetLast),
             MAKE_SERVICE_COMMAND_META(Clear),
         };
     };

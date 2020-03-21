@@ -16,16 +16,16 @@ namespace ams::music {
         return GetQueueCountImpl(out.GetPointer());
     }
 
+    Result ControlService::GetCurrent(sf::OutBuffer out_path) {
+        return GetCurrentImpl(reinterpret_cast<char *>(out_path.GetPointer()), out_path.GetSize());
+    }
+
+    Result ControlService::GetList(sf::OutBuffer out_path, sf::Out<u32> out) {
+        return GetListImpl(reinterpret_cast<char *>(out_path.GetPointer()), out_path.GetSize(), out.GetPointer());
+    }
+
     Result ControlService::AddToQueue(sf::InBuffer path) {
         return AddToQueueImpl(reinterpret_cast<const char *>(path.GetPointer()), path.GetSize());
-    }
-
-    Result ControlService::GetNext(sf::OutBuffer out_path) {
-        return GetNextImpl(reinterpret_cast<char *>(out_path.GetPointer()), out_path.GetSize());
-    }
-
-    Result ControlService::GetLast(sf::OutBuffer out_path) {
-        return GetLastImpl(reinterpret_cast<char *>(out_path.GetPointer()), out_path.GetSize());
     }
 
     Result ControlService::Clear() {

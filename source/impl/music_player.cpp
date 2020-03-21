@@ -92,7 +92,7 @@ namespace ams::music {
                 AudioOutBuffer *released;
                 u32 released_count;
                 /* For each queued buffer wait for one to finish. */
-                for (auto &buffer: audio_buffer) {
+                for (auto &buffer : audio_buffer) {
                     audoutContainsAudioOutBuffer(&buffer, &wait);
                     if (wait)
                         audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul);
@@ -110,14 +110,20 @@ namespace ams::music {
             size_t index = 1;
             while (true) {
                 /* Read decoded audio. */
-                MPG_TRY(mpg123_read(music_handle, (u8 *)audio_buffer[index].buffer, buffer_size, &done));
+                int res = mpg123_read(music_handle, (u8 *)audio_buffer[index].buffer, buffer_size, &done);
+                if (AMS_UNLIKELY(res == MPG123_DONE)) {
+                    break;
+                } else if (AMS_UNLIKELY(res != MPG123_OK)) {
+                    *mpg123_desc = mpg123_plain_strerror(res);
+                    return ResultMpgFailure();
+                }
                 audio_buffer[index].data_size = done;
 
                 /* Check if not supposed to be playing. */
                 if (AMS_UNLIKELY(g_status != PlayerStatus::Playing)) {
                     /* Return if not paused. Exit or Stop requested. */
                     if (g_status != PlayerStatus::Paused) {
-                        return ResultSuccess();
+                        break;
                     }
                     R_TRY(audoutStopAudioOut());
                     while (g_status == PlayerStatus::Paused) {
@@ -136,6 +142,11 @@ namespace ams::music {
 
                 index = (index + 1) % 2;
             }
+
+            /* Finally pop track from queue. */
+            std::scoped_lock lk(g_queue_mutex);
+            if (!g_queue.empty())
+                g_queue.pop();
 
             return ResultSuccess();
         }
@@ -167,12 +178,11 @@ namespace ams::music {
                 has_next = false;
             }
             if (!has_next) {
-                /* Obtain path to next track and pop it of the queue. */
+                /* Obtain path to next track. */
                 std::scoped_lock lk(g_queue_mutex);
                 has_next = !g_queue.empty();
                 if (has_next) {
                     g_current = g_queue.front();
-                    g_queue.pop();
                     std::snprintf(absolute_path, FS_MAX_PATH, "sdmc:%s", g_current.c_str());
 
                     file = fopen("sdmc:/music.log", "a");
@@ -232,20 +242,7 @@ namespace ams::music {
         return ResultSuccess();
     }
 
-    Result AddToQueueImpl(const char *path, size_t path_length) {
-        /* Maps a mp3 file? */
-        std::regex matcher("^(/.*.mp3)$");
-        R_UNLESS(std::regex_match(path, matcher), ResultInvalidPath());
-
-        std::scoped_lock lk(g_queue_mutex);
-
-        /* Add song to queue. */
-        g_queue.push(path);
-
-        return ResultSuccess();
-    }
-
-    Result GetNextImpl(char *out_path, size_t out_path_length) {
+    Result GetCurrentImpl(char *out_path, size_t out_path_length) {
         std::scoped_lock lk(g_queue_mutex);
 
         /* Make sure queue isn't empty. */
@@ -260,17 +257,36 @@ namespace ams::music {
         return ResultSuccess();
     }
 
-    Result GetLastImpl(char *out_path, size_t out_path_length) {
+    Result GetListImpl(char *out_path, size_t out_path_length, u32 *out) {
+        /* Make copy of our queue. */
+        std::queue<std::string> queue_copy;
+        {
+            std::scoped_lock lk(g_queue_mutex);
+            queue_copy = g_queue;
+        }
+
+        /* Traverse queue and write to buffer. */
+        size_t remaining = out_path_length / FS_MAX_PATH;
+        while (!queue_copy.empty() && remaining) {
+            const auto &next = queue_copy.front();
+            std::strncpy(out_path, next.c_str(), FS_MAX_PATH);
+            queue_copy.pop();
+            out_path += FS_MAX_PATH;
+            remaining--;
+        }
+
+        return ResultSuccess();
+    }
+
+    Result AddToQueueImpl(const char *path, size_t path_length) {
+        /* Maps a mp3 file? */
+        std::regex matcher("^(/.*.mp3)$");
+        R_UNLESS(std::regex_match(path, matcher), ResultInvalidPath());
+
         std::scoped_lock lk(g_queue_mutex);
 
-        /* Make sure queue isn't empty. */
-        R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
-
-        const auto &last = g_queue.back();
-
-        /* Path length sufficient? */
-        R_UNLESS(out_path_length >= last.length(), ResultInvalidArgument());
-        std::strcpy(out_path, last.c_str());
+        /* Add song to queue. */
+        g_queue.push(path);
 
         return ResultSuccess();
     }
