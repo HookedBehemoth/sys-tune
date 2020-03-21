@@ -1,0 +1,5 @@
+*.elf
+*.nso
+*.nsp
+.vscode
+build
