@@ -30,7 +30,7 @@ namespace ams::music {
         mpg123_handle *music_handle = nullptr;
 
         ams::Result ThreadFuncImpl(const char **mpg123_desc, const char *path) {
-            /* Music init */
+            /* Start audio out init */
             R_TRY(audoutStartAudioOut());
             ON_SCOPE_EXIT { audoutStopAudioOut(); };
 
@@ -60,7 +60,7 @@ namespace ams::music {
             off_t length_samp = mpg123_length(music_handle);
             R_UNLESS(length_samp != MPG123_ERR, ResultMpgFailure());
 
-            size_t data_size = mpg123_outblock(music_handle) * 2;
+            size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
 
             u8 *a_buffer = (u8 *)memalign(0x1000, buffer_size);
@@ -84,6 +84,19 @@ namespace ams::music {
                     .buffer_size = buffer_size,
                     .data_offset = 0,
                 },
+            };
+
+            /* Audio get's crackly if you stop audout without waiting for remaining buffers. */
+            ON_SCOPE_EXIT {
+                bool wait;
+                AudioOutBuffer *released;
+                u32 released_count;
+                /* For each queued buffer wait for one to finish. */
+                for (auto &buffer: audio_buffer) {
+                    audoutContainsAudioOutBuffer(&buffer, &wait);
+                    if (wait)
+                        audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul);
+                }
             };
 
             size_t done;
@@ -171,16 +184,8 @@ namespace ams::music {
             }
             /* Only play if playing and we have a track queued. */
             if (g_status == PlayerStatus::Playing && has_next) {
-                /* Audio get's chipy after the first run. */
-                Result rc = 0;
-                sm::DoWithSession([&] {
-                    rc = audoutInitialize();
-                });
-                ON_SCOPE_EXIT { audoutExit(); };
-
                 const char *mpg_desc = nullptr;
-                if (R_SUCCEEDED(rc))
-                    rc = ThreadFuncImpl(&mpg_desc, absolute_path);
+                Result rc = ThreadFuncImpl(&mpg_desc, absolute_path);
 
                 /* Log error. */
                 if (R_FAILED(rc)) {

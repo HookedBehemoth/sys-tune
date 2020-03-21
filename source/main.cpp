@@ -56,7 +56,7 @@ void __appInit() {
     hos::SetVersionForLibnx();
 
     sm::DoWithSession([] {
-        //R_ABORT_UNLESS(audoutInitialize());
+        R_ABORT_UNLESS(audoutInitialize());
         R_ABORT_UNLESS(fsInitialize());
     });
 
@@ -66,7 +66,7 @@ void __appInit() {
 void __appExit(void) {
     fsdevUnmountAll();
     fsExit();
-    //audoutExit();
+    audoutExit();
 }
 
 namespace {
