@@ -44,6 +44,7 @@ namespace ams::music {
             /* Set parameters. */
             MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
             MPG_TRY(mpg123_param(music_handle, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
+            MPG_TRY(mpg123_volume(music_handle, 0.5));
 
             /* Open file. */
             MPG_TRY(mpg123_open(music_handle, path));
@@ -58,25 +59,45 @@ namespace ams::music {
             off_t length_samp = mpg123_length(music_handle);
             R_UNLESS(length_samp != MPG123_ERR, ResultMpgFailure());
 
-	        size_t data_size = mpg123_outblock(music_handle) * 16;
+            size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
-            u8 *buffer = (u8 *)memalign(0x1000, buffer_size);
-            R_UNLESS(buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-            ON_SCOPE_EXIT { free(buffer); };
 
-            bool initial = true;
+            u8 *a_buffer = (u8 *)memalign(0x1000, buffer_size);
+            R_UNLESS(a_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
+            ON_SCOPE_EXIT { free(a_buffer); };
+
+            u8 *b_buffer = (u8 *)memalign(0x1000, buffer_size);
+            R_UNLESS(b_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
+            ON_SCOPE_EXIT { free(b_buffer); };
+
+            AudioOutBuffer audio_buffer[2] = {
+                {
+                    .next = nullptr,
+                    .buffer = a_buffer,
+                    .buffer_size = buffer_size,
+                    .data_offset = 0,
+                },
+                {
+                    .next = nullptr,
+                    .buffer = b_buffer,
+                    .buffer_size = buffer_size,
+                    .data_offset = 0,
+                },
+            };
+
             size_t done;
+
+            /* Read initial buffer. */
+            MPG_TRY(mpg123_read(music_handle, (u8 *)audio_buffer[0].buffer, buffer_size, &done));
+            audio_buffer[0].data_size = done;
+            /* Applend buffer. */
+            R_TRY(audoutAppendAudioOutBuffer(&audio_buffer[0]));
+
+            size_t index = 1;
             while (true) {
                 /* Read decoded audio. */
-                MPG_TRY(mpg123_read(music_handle, buffer, buffer_size, &done));
- 
-                AudioOutBuffer audio_buffer = {
-                    .next = nullptr,
-                    .buffer = buffer,
-                    .buffer_size = buffer_size,
-                    .data_size = done,
-                    .data_offset = 0,
-                };
+                MPG_TRY(mpg123_read(music_handle, (u8 *)audio_buffer[index].buffer, buffer_size, &done));
+                audio_buffer[index].data_size = done;
 
                 /* Check if not supposed to be playing. */
                 while (g_status != PlayerStatus::Playing) {
@@ -87,17 +108,15 @@ namespace ams::music {
                     /* Sleep if paused. */
                     svcSleepThread(100'000'000ul);
                 }
+                /* Append the decoded audio buffer. */
+                R_TRY(audoutAppendAudioOutBuffer(&audio_buffer[index]));
 
-                /* Wait for the last buffer to play if already appended. */
+                /* Wait for the last buffer to stop playing. */
                 AudioOutBuffer *released;
                 u32 released_count;
-                if (!initial) {
-                    R_TRY(audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul));
-                } else {
-                    initial = false;
-                }
-                /* Append the decoded audio buffer. */
-                R_TRY(audoutAppendAudioOutBuffer(&audio_buffer));
+                R_TRY(audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul));
+
+                index = (index + 1) % 2;
             }
 
             return ResultSuccess();
