@@ -3,6 +3,7 @@
 #include "../music_result.hpp"
 
 #include <atomic>
+#include <malloc.h>
 #include <mpg123.h>
 #include <queue>
 #include <regex>
@@ -11,7 +12,7 @@
 #define MPG_TRY(res_expr)                              \
     ({                                                 \
         const auto res = (res_expr);                   \
-        if (res != MPG123_OK) {                        \
+        if (AMS_UNLIKELY(res != MPG123_OK)) {          \
             *mpg123_desc = mpg123_plain_strerror(res); \
             return ResultMpgFailure();                 \
         }                                              \
@@ -39,6 +40,7 @@ namespace ams::music {
             int err;
             music_handle = mpg123_new(nullptr, &err);
             MPG_TRY(err);
+            ON_SCOPE_EXIT { mpg123_delete(music_handle); };
 
             /* Set parameters. */
             MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
@@ -58,16 +60,16 @@ namespace ams::music {
             off_t length_samp = mpg123_length(music_handle);
             R_UNLESS(length_samp != MPG123_ERR, ResultMpgFailure());
 
-            size_t data_size = mpg123_outblock(music_handle);
+            size_t data_size = mpg123_outblock(music_handle) * 2;
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
 
-            u8 *a_buffer = new (std::align_val_t(0x1000)) u8[0x1000];
+            u8 *a_buffer = (u8 *)memalign(0x1000, buffer_size);
             R_UNLESS(a_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-            ON_SCOPE_EXIT { delete[] a_buffer; };
+            ON_SCOPE_EXIT { free(a_buffer); };
 
-            u8 *b_buffer = new (std::align_val_t(0x1000)) u8[0x1000];
+            u8 *b_buffer = (u8 *)memalign(0x1000, buffer_size);
             R_UNLESS(b_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-            ON_SCOPE_EXIT { delete[] b_buffer; };
+            ON_SCOPE_EXIT { free(b_buffer); };
 
             AudioOutBuffer audio_buffer[2] = {
                 {
@@ -99,13 +101,17 @@ namespace ams::music {
                 audio_buffer[index].data_size = done;
 
                 /* Check if not supposed to be playing. */
-                while (g_status != PlayerStatus::Playing) {
+                if (AMS_UNLIKELY(g_status != PlayerStatus::Playing)) {
                     /* Return if not paused. Exit or Stop requested. */
                     if (g_status != PlayerStatus::Paused) {
                         return ResultSuccess();
                     }
-                    /* Sleep if paused. */
-                    svcSleepThread(100'000'000ul);
+                    R_TRY(audoutStopAudioOut());
+                    while (g_status == PlayerStatus::Paused) {
+                        /* Sleep if paused. */
+                        svcSleepThread(100'000'000ul);
+                    }
+                    R_TRY(audoutStartAudioOut());
                 }
                 /* Append the decoded audio buffer. */
                 R_TRY(audoutAppendAudioOutBuffer(&audio_buffer[index]));
@@ -142,8 +148,13 @@ namespace ams::music {
 
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_status != PlayerStatus::Exit) {
+            /* Deque current track. */
+            if (g_status == PlayerStatus::Next) {
+                g_status = PlayerStatus::Playing;
+                has_next = false;
+            }
             if (!has_next) {
-                /* Obtain path to next file and pop it of the queue. */
+                /* Obtain path to next track and pop it of the queue. */
                 std::scoped_lock lk(g_mutex);
                 has_next = !g_queue.empty();
                 if (has_next) {
@@ -158,10 +169,19 @@ namespace ams::music {
                     }
                 }
             }
-            /* Only play if not stopped and we have a song queued. */
+            /* Only play if playing and we have a track queued. */
             if (g_status == PlayerStatus::Playing && has_next) {
+                /* Audio get's chipy after the first run. */
+                Result rc = 0;
+                sm::DoWithSession([&] {
+                    rc = audoutInitialize();
+                });
+                ON_SCOPE_EXIT { audoutExit(); };
+
                 const char *mpg_desc = nullptr;
-                Result rc = ThreadFuncImpl(&mpg_desc, absolute_path);
+                if (R_SUCCEEDED(rc))
+                    rc = ThreadFuncImpl(&mpg_desc, absolute_path);
+
                 /* Log error. */
                 if (R_FAILED(rc)) {
                     file = fopen("sdmc:/music.log", "a");

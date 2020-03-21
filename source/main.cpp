@@ -8,7 +8,7 @@ u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 u32 __nx_fsdev_direntry_cache_size = 1;
 
-#define INNER_HEAP_SIZE 0x30000
+#define INNER_HEAP_SIZE 0x40000
 size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 char nx_inner_heap[INNER_HEAP_SIZE];
 
@@ -56,7 +56,7 @@ void __appInit() {
     hos::SetVersionForLibnx();
 
     sm::DoWithSession([] {
-        R_ABORT_UNLESS(audoutInitialize());
+        //R_ABORT_UNLESS(audoutInitialize());
         R_ABORT_UNLESS(fsInitialize());
     });
 
@@ -66,7 +66,7 @@ void __appInit() {
 void __appExit(void) {
     fsdevUnmountAll();
     fsExit();
-    audoutExit();
+    //audoutExit();
 }
 
 namespace {
