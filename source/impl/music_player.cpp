@@ -29,7 +29,7 @@ namespace ams::music {
         os::Mutex g_mutex;
 
         mpg123_handle *music_handle = nullptr;
-        constexpr const s64 ReadSize = 0x1000;
+        constexpr const s64 ReadSize = 0x10000;
         u8 buffer[ReadSize];
 
         ams::Result ThreadFuncImpl(const char **mpg123_desc, const char *path) {
@@ -62,7 +62,7 @@ namespace ams::music {
             R_TRY(audoutStartAudioOut());
             ON_SCOPE_EXIT { audoutStopAudioOut(); };
 
-            constexpr const u32 buffer_size = 0x8000;
+            constexpr const u32 buffer_size = 0x10000;
             u8 *audio_memory = (u8 *)memalign(0x1000, buffer_size);
             R_UNLESS(audio_memory, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
 
@@ -76,7 +76,9 @@ namespace ams::music {
                 R_TRY(fs::ReadFile(&read_bytes, mp3_file, pos, buffer, ReadSize));
 
                 size_t done;
-                MPG_TRY(mpg123_decode(music_handle, buffer, read_bytes, audio_memory, buffer_size, &done));
+                int err = mpg123_decode(music_handle, buffer, read_bytes, audio_memory, buffer_size, &done);
+                if (err == MPG123_NEED_MORE)
+                    continue;
                 audio_buffer.buffer_size = done;
                 audio_buffer.data_size = done;
 
@@ -114,19 +116,27 @@ namespace ams::music {
     void ThreadFunc(void *) {
         bool has_next = false;
         char absolute_path[FS_MAX_PATH];
+
+        {
+            ScopedFile log("sdmc:/music.log");
+            log.WriteString("Thread start\n");
+        }
+
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_status != PlayerStatus::Exit) {
             if (!has_next) {
                 /* Obtain path to next file and pop it of the queue. */
                 std::scoped_lock lk(g_mutex);
-                has_next = g_queue.empty();
+                has_next = !g_queue.empty();
                 if (has_next) {
                     g_current = g_queue.front();
                     g_queue.pop();
                     std::snprintf(absolute_path, FS_MAX_PATH, "sdmc:%s", g_current.c_str());
-                } else {
-                    /* Nothing queued. Let's sleep for a second. */
-                    svcSleepThread(100'000'000ul);
+
+                    {
+                        ScopedFile log("sdmc:/music.log");
+                        log.WriteFormat("next song: %s\n", absolute_path);
+                    }
                 }
             }
             /* Only play if not stopped and we have a song queued. */
@@ -137,12 +147,12 @@ namespace ams::music {
                 if (R_FAILED(rc)) {
                     ScopedFile log("sdmc:/music.log");
                     if (rc.GetValue() == ResultMpgFailure().GetValue()) {
-                        if (mpg_desc) {
+                        if (!mpg_desc) {
                             mpg_desc = "UNKNOWN";
                         }
                         log.WriteFormat("mpg error: %s\n", mpg_desc);
                     } else {
-                        log.WriteFormat("other error: %d\n", rc.GetDescription());
+                        log.WriteFormat("other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
                     }
                     g_status = PlayerStatus::Exit;
                     break;
@@ -150,7 +160,20 @@ namespace ams::music {
                     has_next = false;
                     absolute_path[0] = '\0';
                 }
+            } else {
+                /* Nothing queued. Let's sleep. */
+                svcSleepThread(1'000'000'000ul);
+
+                {
+                    ScopedFile log("sdmc:/music.log");
+                    log.WriteString("Thread sleep\n");
+                }
             }
+        }
+
+        {
+            ScopedFile log("sdmc:/music.log");
+            log.WriteString("Thread stop\n");
         }
     }
 
@@ -170,53 +193,44 @@ namespace ams::music {
     }
 
     Result AddToQueueImpl(const char *path, size_t path_length) {
-        /* Path length sufficient. */
-        R_UNLESS(path_length >= FS_MAX_PATH, ResultInvalidArgument());
-
-        /* Maps an mp3 file. */
-        std::regex matcher("^(sdmc:/.*.mp3)$");
+        /* Maps a mp3 file? */
+        std::regex matcher("^(/.*.mp3)$");
         R_UNLESS(std::regex_match(path, matcher), ResultInvalidPath());
 
-        {
-            std::scoped_lock lk(g_mutex);
+        std::scoped_lock lk(g_mutex);
 
-            /* Add song to queue. */
-            g_queue.push(path);
-        }
+        /* Add song to queue. */
+        g_queue.push(path);
 
         return ResultSuccess();
     }
 
     Result GetNextImpl(char *out_path, size_t out_path_length) {
-        /* Path length sufficient. */
-        R_UNLESS(out_path_length >= FS_MAX_PATH, ResultInvalidArgument());
+        std::scoped_lock lk(g_mutex);
 
-        {
-            std::scoped_lock lk(g_mutex);
+        /* Make sure queue isn't empty. */
+        R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
 
-            /* Make sure queue isn't empty. */
-            R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
+        const auto &next = g_queue.front();
 
-            const auto &next = g_queue.front();
-            std::strcpy(out_path, next.c_str());
-        }
+        /* Path length sufficient? */
+        R_UNLESS(out_path_length >= next.length(), ResultInvalidArgument());
+        std::strcpy(out_path, next.c_str());
 
         return ResultSuccess();
     }
 
     Result GetLastImpl(char *out_path, size_t out_path_length) {
-        /* Path length sufficient. */
-        R_UNLESS(out_path_length >= FS_MAX_PATH, ResultInvalidArgument());
+        std::scoped_lock lk(g_mutex);
 
-        {
-            std::scoped_lock lk(g_mutex);
+        /* Make sure queue isn't empty. */
+        R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
 
-            /* Make sure queue isn't empty. */
-            R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
+        const auto &last = g_queue.back();
 
-            const auto &next = g_queue.back();
-            std::strcpy(out_path, next.c_str());
-        }
+        /* Path length sufficient? */
+        R_UNLESS(out_path_length >= last.length(), ResultInvalidArgument());
+        std::strcpy(out_path, last.c_str());
 
         return ResultSuccess();
     }
