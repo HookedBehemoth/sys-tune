@@ -265,6 +265,7 @@ namespace ams::music {
             queue_copy = g_queue;
         }
 
+        u32 tmp = 0;
         /* Traverse queue and write to buffer. */
         size_t remaining = out_path_length / FS_MAX_PATH;
         while (!queue_copy.empty() && remaining) {
@@ -273,7 +274,9 @@ namespace ams::music {
             queue_copy.pop();
             out_path += FS_MAX_PATH;
             remaining--;
+            tmp++;
         }
+        *out = tmp;
 
         return ResultSuccess();
     }
