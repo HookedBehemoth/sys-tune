@@ -3,7 +3,6 @@
 #include "../music_result.hpp"
 
 #include <atomic>
-#include <malloc.h>
 #include <mpg123.h>
 #include <queue>
 #include <regex>
@@ -62,13 +61,13 @@ namespace ams::music {
             size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
 
-            u8 *a_buffer = (u8 *)memalign(0x1000, buffer_size);
+            u8 *a_buffer = new (std::align_val_t(0x1000)) u8[0x1000];
             R_UNLESS(a_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-            ON_SCOPE_EXIT { free(a_buffer); };
+            ON_SCOPE_EXIT { delete[] a_buffer; };
 
-            u8 *b_buffer = (u8 *)memalign(0x1000, buffer_size);
+            u8 *b_buffer = new (std::align_val_t(0x1000)) u8[0x1000];
             R_UNLESS(b_buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-            ON_SCOPE_EXIT { free(b_buffer); };
+            ON_SCOPE_EXIT { delete[] b_buffer; };
 
             AudioOutBuffer audio_buffer[2] = {
                 {
