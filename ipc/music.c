@@ -4,6 +4,19 @@
 
 Service g_music;
 
+bool musicIsRunning() {
+    Handle handle;
+    SmServiceName music = smEncodeName("music");
+    Result rc = smRegisterService(&handle, music, false, 1);
+
+    if (R_SUCCEEDED(rc)) {
+        smUnregisterService(music);
+        return false;
+    } else {
+        return true;
+    }
+}
+
 Result musicInitialize() {
     return smGetService(&g_music, "music");
 }
@@ -28,30 +41,35 @@ Result musicSetStatus(MusicPlayerStatus status) {
 Result musicGetQueueCount(u32 *out) {
     u32 tmp;
     Result rc = serviceDispatchOut(&g_music, 2, tmp);
-    if (R_SUCCEEDED(rc) && out)
-        *out = tmp;
+    if (R_SUCCEEDED(rc) && out) *out = tmp;
+    return rc;
+}
+
+Result musicGetCurrent(char *out_path, size_t out_path_length) {
+    return serviceDispatch(&g_music, 3,
+        .buffer_attrs = { SfBufferAttr_Out | SfBufferAttr_HipcMapAlias },
+        .buffers = { { out_path, out_path_length } },
+    );
+}
+
+Result musicGetList(u32 *read, char *out_path, size_t out_path_length) {
+    u32 tmp;
+    Result rc = serviceDispatchOut(&g_music, 4, tmp,
+        .buffer_attrs = { SfBufferAttr_Out | SfBufferAttr_HipcMapAlias },
+        .buffers = { { out_path, out_path_length } },
+    );
+    if (R_SUCCEEDED(rc) && read) *read = tmp;
     return rc;
 }
 
 Result musicAddToQueue(const char *path) {
     size_t path_length = strlen(path);
-    return serviceDispatch(&g_music, 3,
-                           .buffer_attrs = {SfBufferAttr_In | SfBufferAttr_HipcMapAlias},
-                           .buffers = {{path, path_length}}, );
-}
-
-Result musicGetNext(char *out_path, size_t out_path_length) {
-    return serviceDispatch(&g_music, 4,
-                           .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
-                           .buffers = {{out_path, out_path_length}}, );
-}
-
-Result musicGetLast(char *out_path, size_t out_path_length) {
-    return serviceDispatch(&g_music, 5,
-                           .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
-                           .buffers = {{out_path, out_path_length}}, );
+    return serviceDispatch(&g_music, 10,
+        .buffer_attrs = { SfBufferAttr_In | SfBufferAttr_HipcMapAlias },
+        .buffers = { { path, path_length } },
+    );
 }
 
 Result musicClear() {
-    return serviceDispatch(&g_music, 6);
+    return serviceDispatch(&g_music, 11);
 }
