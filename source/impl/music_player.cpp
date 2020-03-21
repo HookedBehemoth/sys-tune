@@ -25,7 +25,7 @@ namespace ams::music {
         std::string g_current;
         std::queue<std::string> g_queue;
         std::atomic<PlayerStatus> g_status;
-        os::Mutex g_mutex;
+        os::Mutex g_queue_mutex;
 
         mpg123_handle *music_handle = nullptr;
 
@@ -154,7 +154,7 @@ namespace ams::music {
         char absolute_path[FS_MAX_PATH];
 
         FILE *file = fopen("sdmc:/music.log", "a");
-        if (file) {
+        if (AMS_LIKELY(file)) {
             fputs("Thread start\n", file);
             fclose(file);
         }
@@ -168,7 +168,7 @@ namespace ams::music {
             }
             if (!has_next) {
                 /* Obtain path to next track and pop it of the queue. */
-                std::scoped_lock lk(g_mutex);
+                std::scoped_lock lk(g_queue_mutex);
                 has_next = !g_queue.empty();
                 if (has_next) {
                     g_current = g_queue.front();
@@ -176,7 +176,7 @@ namespace ams::music {
                     std::snprintf(absolute_path, FS_MAX_PATH, "sdmc:%s", g_current.c_str());
 
                     file = fopen("sdmc:/music.log", "a");
-                    if (file) {
+                    if (AMS_LIKELY(file)) {
                         fprintf(file, "next song: %s\n", absolute_path);
                         fclose(file);
                     }
@@ -211,7 +211,7 @@ namespace ams::music {
         }
 
         file = fopen("sdmc:/music.log", "a");
-        if (file) {
+        if (AMS_LIKELY(file)) {
             fputs("Thread stop\n", file);
             fclose(file);
         }
@@ -237,7 +237,7 @@ namespace ams::music {
         std::regex matcher("^(/.*.mp3)$");
         R_UNLESS(std::regex_match(path, matcher), ResultInvalidPath());
 
-        std::scoped_lock lk(g_mutex);
+        std::scoped_lock lk(g_queue_mutex);
 
         /* Add song to queue. */
         g_queue.push(path);
@@ -246,7 +246,7 @@ namespace ams::music {
     }
 
     Result GetNextImpl(char *out_path, size_t out_path_length) {
-        std::scoped_lock lk(g_mutex);
+        std::scoped_lock lk(g_queue_mutex);
 
         /* Make sure queue isn't empty. */
         R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
@@ -261,7 +261,7 @@ namespace ams::music {
     }
 
     Result GetLastImpl(char *out_path, size_t out_path_length) {
-        std::scoped_lock lk(g_mutex);
+        std::scoped_lock lk(g_queue_mutex);
 
         /* Make sure queue isn't empty. */
         R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
@@ -276,7 +276,7 @@ namespace ams::music {
     }
 
     Result ClearImpl() {
-        std::scoped_lock lk(g_mutex);
+        std::scoped_lock lk(g_queue_mutex);
 
         while (!g_queue.empty())
             g_queue.pop();
