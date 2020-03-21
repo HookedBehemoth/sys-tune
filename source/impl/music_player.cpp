@@ -1,7 +1,6 @@
 #include "music_player.hpp"
 
 #include "../music_result.hpp"
-#include "../scoped_file.hpp"
 
 #include <atomic>
 #include <malloc.h>
@@ -29,58 +28,55 @@ namespace ams::music {
         os::Mutex g_mutex;
 
         mpg123_handle *music_handle = nullptr;
-        constexpr const s64 ReadSize = 0x10000;
-        u8 buffer[ReadSize];
 
         ams::Result ThreadFuncImpl(const char **mpg123_desc, const char *path) {
-            MPG_TRY(mpg123_init());
-
-            /* Allocate music parameters. */
-            int err;
-            auto *pars = mpg123_new_pars(&err);
-            MPG_TRY(err);
-            ON_SCOPE_EXIT { mpg123_delete_pars(pars); };
-
-            /* Set parameters. */
-            MPG_TRY(mpg123_par(pars, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
-            MPG_TRY(mpg123_par(pars, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
-
-            /* Allocate music handle. */
-            music_handle = mpg123_parnew(pars, nullptr, &err);
-            MPG_TRY(err);
-            ON_SCOPE_EXIT { mpg123_delete(music_handle); };
-
-            /* Open mp3 feed. */
-            MPG_TRY(mpg123_open_feed(music_handle));
-
-            fs::FileHandle mp3_file;
-            R_TRY(fs::OpenFile(&mp3_file, path, fs::OpenMode_Read));
-
-            s64 file_size;
-            R_TRY(fs::GetFileSize(&file_size, mp3_file));
-
+            /* Music init */
             R_TRY(audoutStartAudioOut());
             ON_SCOPE_EXIT { audoutStopAudioOut(); };
 
-            constexpr const u32 buffer_size = 0x10000;
-            u8 *audio_memory = (u8 *)memalign(0x1000, buffer_size);
-            R_UNLESS(audio_memory, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
+            MPG_TRY(mpg123_init());
+            ON_SCOPE_EXIT { mpg123_exit(); };
 
-            AudioOutBuffer audio_buffer{
-                .buffer = audio_memory,
-            };
+            int err;
+            music_handle = mpg123_new(nullptr, &err);
+            MPG_TRY(err);
 
-            s64 pos = 0;
-            while (pos < file_size) {
-                size_t read_bytes;
-                R_TRY(fs::ReadFile(&read_bytes, mp3_file, pos, buffer, ReadSize));
+            /* Set parameters. */
+            MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
+            MPG_TRY(mpg123_param(music_handle, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
 
-                size_t done;
-                int err = mpg123_decode(music_handle, buffer, read_bytes, audio_memory, buffer_size, &done);
-                if (err == MPG123_NEED_MORE)
-                    continue;
-                audio_buffer.buffer_size = done;
-                audio_buffer.data_size = done;
+            /* Open file. */
+            MPG_TRY(mpg123_open(music_handle, path));
+            ON_SCOPE_EXIT { mpg123_close(music_handle); };
+
+            long rate;
+            int channels, encoding;
+            MPG_TRY(mpg123_getformat(music_handle, &rate, &channels, &encoding));
+            MPG_TRY(mpg123_format_none(music_handle));
+            MPG_TRY(mpg123_format(music_handle, rate, channels, encoding));
+
+            off_t length_samp = mpg123_length(music_handle);
+            R_UNLESS(length_samp != MPG123_ERR, ResultMpgFailure());
+
+	        size_t data_size = mpg123_outblock(music_handle) * 16;
+            size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
+            u8 *buffer = (u8 *)memalign(0x1000, buffer_size);
+            R_UNLESS(buffer, MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
+            ON_SCOPE_EXIT { free(buffer); };
+
+            bool initial = true;
+            size_t done;
+            while (true) {
+                /* Read decoded audio. */
+                MPG_TRY(mpg123_read(music_handle, buffer, buffer_size, &done));
+ 
+                AudioOutBuffer audio_buffer = {
+                    .next = nullptr,
+                    .buffer = buffer,
+                    .buffer_size = buffer_size,
+                    .data_size = done,
+                    .data_offset = 0,
+                };
 
                 /* Check if not supposed to be playing. */
                 while (g_status != PlayerStatus::Playing) {
@@ -92,13 +88,16 @@ namespace ams::music {
                     svcSleepThread(100'000'000ul);
                 }
 
+                /* Wait for the last buffer to play if already appended. */
                 AudioOutBuffer *released;
                 u32 released_count;
-                R_TRY(audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul));
+                if (!initial) {
+                    R_TRY(audoutWaitPlayFinish(&released, &released_count, 1'000'000'000ul));
+                } else {
+                    initial = false;
+                }
                 /* Append the decoded audio buffer. */
                 R_TRY(audoutAppendAudioOutBuffer(&audio_buffer));
-
-                pos += read_bytes;
             }
 
             return ResultSuccess();
@@ -117,9 +116,10 @@ namespace ams::music {
         bool has_next = false;
         char absolute_path[FS_MAX_PATH];
 
-        {
-            ScopedFile log("sdmc:/music.log");
-            log.WriteString("Thread start\n");
+        FILE *file = fopen("sdmc:/music.log", "a");
+        if (file) {
+            fputs("Thread start\n", file);
+            fclose(file);
         }
 
         /* Run as long as we aren't stopped and no error has been encountered. */
@@ -133,9 +133,10 @@ namespace ams::music {
                     g_queue.pop();
                     std::snprintf(absolute_path, FS_MAX_PATH, "sdmc:%s", g_current.c_str());
 
-                    {
-                        ScopedFile log("sdmc:/music.log");
-                        log.WriteFormat("next song: %s\n", absolute_path);
+                    file = fopen("sdmc:/music.log", "a");
+                    if (file) {
+                        fprintf(file, "next song: %s\n", absolute_path);
+                        fclose(file);
                     }
                 }
             }
@@ -145,35 +146,31 @@ namespace ams::music {
                 Result rc = ThreadFuncImpl(&mpg_desc, absolute_path);
                 /* Log error. */
                 if (R_FAILED(rc)) {
-                    ScopedFile log("sdmc:/music.log");
+                    file = fopen("sdmc:/music.log", "a");
+                    if (!file)
+                        continue;
+
                     if (rc.GetValue() == ResultMpgFailure().GetValue()) {
-                        if (!mpg_desc) {
+                        if (!mpg_desc)
                             mpg_desc = "UNKNOWN";
-                        }
-                        log.WriteFormat("mpg error: %s\n", mpg_desc);
+                        fprintf(file, "mpg error: %s\n", mpg_desc);
                     } else {
-                        log.WriteFormat("other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                        fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
                     }
-                    g_status = PlayerStatus::Exit;
-                    break;
-                } else {
-                    has_next = false;
-                    absolute_path[0] = '\0';
+                    fclose(file);
                 }
+                has_next = false;
+                absolute_path[0] = '\0';
             } else {
                 /* Nothing queued. Let's sleep. */
                 svcSleepThread(1'000'000'000ul);
-
-                {
-                    ScopedFile log("sdmc:/music.log");
-                    log.WriteString("Thread sleep\n");
-                }
             }
         }
 
-        {
-            ScopedFile log("sdmc:/music.log");
-            log.WriteString("Thread stop\n");
+        file = fopen("sdmc:/music.log", "a");
+        if (file) {
+            fputs("Thread stop\n", file);
+            fclose(file);
         }
     }
 

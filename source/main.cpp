@@ -1,6 +1,5 @@
 #include "impl/music_player.hpp"
 #include "music_control_service.hpp"
-#include "scoped_file.hpp"
 
 extern "C" {
 extern u32 __start__;
@@ -9,7 +8,7 @@ u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 u32 __nx_fsdev_direntry_cache_size = 1;
 
-#define INNER_HEAP_SIZE 0x180000
+#define INNER_HEAP_SIZE 0x320000
 size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 char nx_inner_heap[INNER_HEAP_SIZE];
 
@@ -58,17 +57,15 @@ void __appInit() {
 
     sm::DoWithSession([] {
         R_ABORT_UNLESS(audoutInitialize());
-        R_ABORT_UNLESS(timeInitialize());
         R_ABORT_UNLESS(fsInitialize());
     });
 
-    R_ABORT_UNLESS(fs::MountSdCard("sdmc"));
+    fsdevMountSdmc();
 }
 
 void __appExit(void) {
-    fs::Unmount("sdmc");
+    fsdevUnmountAll();
     fsExit();
-    timeExit();
     audoutExit();
 }
 
@@ -87,14 +84,8 @@ int main(int argc, char *argv[]) {
     music::Initialize();
 
     os::Thread audioThread;
-
-    {
-        //ScopedFile log("sdmc:/music.log");
-        ams::Result rc = audioThread.Initialize(music::ThreadFunc, nullptr, 0x4000, 0x20);
-        //log.WriteFormat("0x%x, Initialize thread\n", rc.GetValue());
-        rc = audioThread.Start();
-        //log.WriteFormat("0x%x, Start thread\n", rc.GetValue());
-    }
+    audioThread.Initialize(music::ThreadFunc, nullptr, 0x10000, 0x20);
+    audioThread.Start();
 
     /* Create services */
     R_ASSERT(g_server_manager.RegisterServer<music::ControlService>(MusicServiceName, MusicMaxSessions));
@@ -103,12 +94,7 @@ int main(int argc, char *argv[]) {
 
     music::Exit();
 
-    {
-        //ScopedFile log("sdmc:/music.log");
-        ams::Result rc = audioThread.Wait();
-        //log.WriteFormat("0x%x, Wait thread\n", rc.GetValue());
-        rc = audioThread.Join();
-        //log.WriteFormat("0x%x, Join thread\n", rc.GetValue());
-    }
+    audioThread.Wait();
+    audioThread.Join();
     return 0;
 }
