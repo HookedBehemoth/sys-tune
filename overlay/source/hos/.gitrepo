@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = git@github.com:HookedBehemoth/cpp-HOS-lib.git
+	branch = master
+	commit = d425885b221b6e62ae0257a9ea33f2a85241ccc0
+	parent = 28ac7b807a03f64b492cd4aeb5d01f7219a61259
+	method = merge
+	cmdver = 0.4.1
