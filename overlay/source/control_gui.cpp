@@ -2,6 +2,7 @@
 
 #include "../../ipc/music.h"
 #include "music_ovl_frame.hpp"
+#include "browser_gui.hpp"
 
 namespace {
 
@@ -15,7 +16,7 @@ namespace {
 
     u32 count;
     MusicPlayerStatus status;
-    char current_buffer[0x40];
+    char current_buffer[FS_MAX_PATH];
     const char *current = nullptr;
     const char *status_desc = nullptr;
     constexpr const size_t path_buffer_size = FS_MAX_PATH * 10;
@@ -43,7 +44,7 @@ namespace {
 
     void FetchCurrent() {
         current_buffer[0] = '\0';
-        if (R_FAILED(musicGetCurrent(current_buffer, 0x40)) || current_buffer[0] == '\0') {
+        if (R_FAILED(musicGetCurrent(current_buffer, FS_MAX_PATH)) || current_buffer[0] == '\0') {
             current = nullptr;
         } else {
             current = current_buffer;
@@ -89,7 +90,7 @@ ControlGui::ControlGui()
 
 tsl::elm::Element *ControlGui::createUI() {
     auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &current_desc);
-    this->m_list.setBoundaries(0, 250, tsl::cfg::LayerWidth, 470);
+    this->m_list.setBoundaries(0, 250, tsl::cfg::FramebufferWidth, 470);
 
     auto *custom = new tsl::elm::CustomDrawer([&](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
         drawer->drawString("Control", false, 140, 115, 40, 0xffff);
@@ -144,7 +145,7 @@ bool ControlGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition,
     }
 
     if (keysDown & KEY_Y) {
-        musicAddToQueue("/MyPatch.mp3");
+        tsl::changeTo<BrowserGui>();
         return true;
     }
 

@@ -41,7 +41,7 @@ APP_TITLE	:=	Audioplayer Control
 
 TARGET		:=	ovlAudioplayer
 BUILD		:=	build
-SOURCES		:=	source ../ipc
+SOURCES		:=	source source/hos/fs ../ipc
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc
 
