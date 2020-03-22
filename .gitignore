@@ -1,5 +1,7 @@
 *.elf
 *.nso
 *.nsp
+*.nacp
+*.ovl
 .vscode
 build

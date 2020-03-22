@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <switch.h>
 
 typedef enum {
@@ -59,3 +63,7 @@ Result musicAddToQueue(const char *path);
  * @brief Clear queue.
  */
 Result musicClear();
+
+#ifdef __cplusplus
+}
+#endif
