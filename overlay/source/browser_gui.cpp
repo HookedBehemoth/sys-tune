@@ -4,6 +4,8 @@
 #include "music_ovl_frame.hpp"
 #include "select_list_item.hpp"
 
+constexpr const char* const base_path = "/music/";
+
 const char *description = "   \uE0E1  Back     \uE0E0  Add";
 char path_buffer[FS_MAX_PATH];
 
@@ -14,6 +16,10 @@ BrowserGui::BrowserGui()
     if (R_SUCCEEDED(rc)) {
         m_fs = IFileSystem(std::move(fs));
         open = true;
+        IDirectory dir;
+        if (R_SUCCEEDED(m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
+            std::strcpy(this->cwd, base_path);
+        }
     }
     m_list = new tsl::elm::List(7);
 }
@@ -21,7 +27,11 @@ BrowserGui::BrowserGui()
 tsl::elm::Element *BrowserGui::createUI() {
     auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &description);
 
-    this->scanCwd();
+    if (open) {
+        this->scanCwd();
+    } else {
+        m_list->addItem(new tsl::elm::ListItem("Couldn't open SdCard filesystem"));
+    }
 
     rootFrame->setContent(m_list);
 
