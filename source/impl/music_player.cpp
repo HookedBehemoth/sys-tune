@@ -27,7 +27,7 @@ namespace ams::music {
         std::atomic<PlayerStatus> g_status;
         std::atomic<double> g_length = 0;
         std::atomic<double> g_progress = 0;
-        std::atomic<double> g_volume = 0.3;
+        std::atomic<double> g_volume = 0.2;
         os::Mutex g_queue_mutex;
 
         mpg123_handle *music_handle = nullptr;
@@ -153,7 +153,7 @@ namespace ams::music {
                 g_progress = tpf * frame;
 
                 /* Set volume. */
-                MPG_TRY(mpg123_volume(music_handle, g_volume));
+                MPG_TRY(mpg123_volume(music_handle, g_volume / 2));
 
                 /* Wait for the last buffer to stop playing. */
                 AudioOutBuffer *released;
