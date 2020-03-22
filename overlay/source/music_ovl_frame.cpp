@@ -25,7 +25,7 @@ void MusicOverlayFrame::layout(u16 parentX, u16 parentY, u16 parentWidth, u16 pa
     this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
     if (this->m_contentElement != nullptr) {
-        this->m_contentElement->setBoundaries(parentX + 10, parentY + 120, parentWidth - 20, parentHeight - 90 - 100);
+        this->m_contentElement->setBoundaries(parentX + 35, parentY + 120, parentWidth - 85, parentHeight - 90 - 100);
         this->m_contentElement->invalidate();
     }
 }
