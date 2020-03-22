@@ -317,9 +317,10 @@ namespace ams::music {
     }
 
     Result AddToQueueImpl(const char *path, size_t path_length) {
+        /* At root. */
+        R_UNLESS(path[0] == '/', ResultInvalidPath());
         /* Maps a mp3 file? */
-        std::regex matcher("^(/.*.mp3)$");
-        R_UNLESS(std::regex_match(path, matcher), ResultInvalidPath());
+        R_UNLESS(strcasecmp(path + path_length - 4, ".mp3") == 0, ResultInvalidPath());
 
         std::scoped_lock lk(g_queue_mutex);
 
