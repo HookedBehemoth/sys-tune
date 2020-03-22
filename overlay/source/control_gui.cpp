@@ -19,7 +19,8 @@ namespace {
     char current_buffer[FS_MAX_PATH];
     const char *current = nullptr;
     const char *status_desc = nullptr;
-    constexpr const size_t path_buffer_size = FS_MAX_PATH * 10;
+    constexpr u32 queue_size = 6;
+    constexpr const size_t path_buffer_size = FS_MAX_PATH * queue_size;
     char path_buffer[path_buffer_size];
 
     double percentage = 0;
@@ -49,6 +50,15 @@ namespace {
         if (R_FAILED(musicGetCurrent(current_buffer, FS_MAX_PATH)) || current_buffer[0] == '\0') {
             current = nullptr;
         } else {
+            /* Only show file name. Ignore path to file and extension. */
+            size_t length = std::strlen(current_buffer);
+            current_buffer[length - 4] = '\0';
+            for (size_t i = length; i >= 0; i--) {
+                if (current_buffer[i] == '/') {
+                    current = current_buffer + i + 1;
+                    return;
+                }
+            }
             current = current_buffer;
         }
     }
@@ -58,9 +68,19 @@ namespace {
         u32 count;
         if (R_SUCCEEDED(musicGetList(&count, path_buffer, path_buffer_size))) {
             if (count != 0) {
-                const char *ptr = path_buffer;
+                /* Only show file name. Ignore path to file and extension. */
+                char *ptr = path_buffer;
                 for (u32 i = 0; i < count; i++) {
-                    list->addItem(new tsl::elm::ListItem(ptr));
+                    const char *str = ptr;
+                    size_t length = std::strlen(ptr);
+                    ptr[length - 4] = '\0';
+                    for (size_t i = length; i >= 0; i--) {
+                        if (ptr[i] == '/') {
+                            str = ptr + i + 1;
+                            break;
+                        }
+                    }
+                    list->addItem(new tsl::elm::ListItem(str));
                     ptr += FS_MAX_PATH;
                 }
             } else {
@@ -97,31 +117,30 @@ namespace {
 }
 
 ControlGui::ControlGui()
-    : m_list(5) {}
+    : m_list(queue_size) {}
 
 tsl::elm::Element *ControlGui::createUI() {
     auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &current_desc);
-    this->m_list.setBoundaries(0, 250, tsl::cfg::FramebufferWidth, 470);
+    this->m_list.setBoundaries(0, 200, tsl::cfg::FramebufferWidth, 470);
 
     auto *custom = new tsl::elm::CustomDrawer([&](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
-        drawer->drawString("Control", false, 140, 115, 40, 0xffff);
-        if (current) {
-            drawer->drawString("Current track:", false, 15, 165, 20, 0xffff);
-            drawer->drawString(current, false, 160, 165, 20, 0xffff);
-            if (status_desc) {
-                drawer->drawString(status_desc, false, 15, 220, 20, 0xffff);
-            }
-            /* Progress bar */
-            u32 bar_length = tsl::cfg::FramebufferWidth - 180;
-            drawer->drawRect(50, 212, bar_length, 2, 0xffff);
-            drawer->drawRect(50, 210, bar_length * percentage, 6, 0xf00f);
-            /* Song length */
-            drawer->drawString(progress_text, false, 330, 220, 20, 0xffff);
-        }
         /* Volume indicator. */
         drawer->drawString("\uE13C", false, 280, 55, 30, 0xffff);
         drawer->drawRect(315, 42, 100, 2, 0xffff);
         drawer->drawRect(315, 40, 100 * volume, 6, 0xfff0);
+        /* Current track and progress bar. */
+        if (current) {
+            drawer->drawString(current, false, 15, 115, 20, 0xffff);
+            if (status_desc) {
+                drawer->drawString(status_desc, false, 15, 170, 20, 0xffff);
+            }
+            /* Progress bar */
+            u32 bar_length = tsl::cfg::FramebufferWidth - 200;
+            drawer->drawRect(50, 162, bar_length, 2, 0xffff);
+            drawer->drawRect(50, 160, bar_length * percentage, 6, 0xf00f);
+            /* Song length */
+            drawer->drawString(progress_text, false, 310, 170, 20, 0xffff);
+        }
         /* Query list */
         m_list.draw(drawer);
     });
