@@ -98,6 +98,9 @@ namespace ams::music {
                 },
             };
 
+            /* Set volume before the first few reads. */
+            MPG_TRY(mpg123_volume(music_handle, g_volume / 2));
+
             /* Audio get's crackly if you stop audout without waiting for remaining buffers. */
             ON_SCOPE_EXIT {
                 bool wait;
