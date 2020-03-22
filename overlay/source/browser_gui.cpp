@@ -4,7 +4,7 @@
 #include "music_ovl_frame.hpp"
 #include "select_list_item.hpp"
 
-constexpr const char* const base_path = "/music/";
+constexpr const char *const base_path = "/music/";
 
 const char *description = "   \uE0E1  Back     \uE0E0  Add";
 char path_buffer[FS_MAX_PATH];
@@ -38,8 +38,7 @@ tsl::elm::Element *BrowserGui::createUI() {
     return rootFrame;
 }
 
-void BrowserGui::update() {
-}
+void BrowserGui::update() {}
 bool BrowserGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
     if (keysDown & KEY_B && this->cwd[1] != '\0') {
         this->upCwd();
