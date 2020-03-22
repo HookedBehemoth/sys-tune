@@ -10,7 +10,7 @@ const char *description = "   \uE0E1  Back     \uE0E0  Add";
 char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
-    : open(), cwd("/") {
+    : m_fs(), open(), has_music(), cwd("/") {
     FsFileSystem fs;
     Result rc = fsOpenSdCardFileSystem(&fs);
     if (R_SUCCEEDED(rc)) {
@@ -19,6 +19,7 @@ BrowserGui::BrowserGui()
         IDirectory dir;
         if (R_SUCCEEDED(m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
             std::strcpy(this->cwd, base_path);
+            this->has_music = true;
         }
     }
     m_list = new tsl::elm::List(7);
@@ -40,9 +41,13 @@ tsl::elm::Element *BrowserGui::createUI() {
 
 void BrowserGui::update() {}
 bool BrowserGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
-    if (keysDown & KEY_B && this->cwd[1] != '\0') {
-        this->upCwd();
-        return true;
+    if (keysDown & KEY_B) {
+        if (this->has_music && this->cwd[7] == '\0') {
+            return false;
+        } else if (this->cwd[1] != '\0') {
+            this->upCwd();
+            return true;
+        }
     }
     return false;
 }

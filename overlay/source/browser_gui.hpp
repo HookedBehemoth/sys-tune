@@ -8,7 +8,7 @@ class BrowserGui : public tsl::Gui {
   private:
     tsl::elm::List *m_list;
     IFileSystem m_fs;
-    bool open;
+    bool open, has_music;
     char cwd[FS_MAX_PATH];
 
   public:

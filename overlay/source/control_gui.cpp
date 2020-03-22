@@ -117,7 +117,9 @@ namespace {
 }
 
 ControlGui::ControlGui()
-    : m_list(queue_size) {}
+    : m_list(queue_size) {
+    FetchVolume();
+}
 
 tsl::elm::Element *ControlGui::createUI() {
     auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &current_desc);
@@ -151,18 +153,17 @@ tsl::elm::Element *ControlGui::createUI() {
 }
 
 void ControlGui::update() {
-    count++;
-    if (count % 15) {
+    if ((count % 30) == 0) {
         FetchStatus();
         FetchCurrent();
         FetchQueue(&this->m_list);
         FetchProgress();
-        FetchVolume();
         count = 0;
     }
+    count++;
 }
 
-bool ControlGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
+bool ControlGui::handleInput(u64 keysDown, u64 keysHeld, touchPosition, JoystickPosition, JoystickPosition) {
     if (keysDown & KEY_A) {
         MusicPlayerStatus next_status;
         if (status == MusicPlayerStatus_Playing) {
@@ -184,12 +185,24 @@ bool ControlGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition,
         return true;
     }
 
-    if (keysDown & KEY_DRIGHT) {
-        musicSetVolume(volume + 0.05);
+    static u32 r_held = 0;
+    if (keysHeld & KEY_DRIGHT && volume < 1) {
+        r_held++;
+        if (r_held >= 10) {
+            volume += 0.05;
+            musicSetVolume(volume);
+            r_held = 0;
+        }
     }
 
-    if (keysDown & KEY_DLEFT) {
-        musicSetVolume(volume - 0.05);
+    static u32 l_held = 0;
+    if (keysHeld & KEY_DLEFT && volume > 0) {
+        l_held++;
+        if (l_held >= 10) {
+            volume -= 0.05;
+            musicSetVolume(volume);
+            l_held = 0;
+        }
     }
 
     if (keysDown & KEY_R || keysDown & KEY_ZR) {
