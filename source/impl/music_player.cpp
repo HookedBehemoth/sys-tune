@@ -163,11 +163,6 @@ namespace ams::music {
                 index = (index + 1) % 2;
             }
 
-            /* Finally pop track from queue. */
-            std::scoped_lock lk(g_queue_mutex);
-            if (!g_queue.empty())
-                g_queue.pop();
-
             return ResultSuccess();
         }
     }
@@ -220,20 +215,25 @@ namespace ams::music {
                 /* Log error. */
                 if (R_FAILED(rc)) {
                     file = fopen("sdmc:/music.log", "a");
-                    if (!file)
-                        continue;
-
-                    if (rc.GetValue() == ResultMpgFailure().GetValue()) {
-                        if (!mpg_desc)
-                            mpg_desc = "UNKNOWN";
-                        fprintf(file, "mpg error: %s\n", mpg_desc);
-                    } else {
-                        fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                    if (AMS_LIKELY(file)) {
+                        if (rc.GetValue() == ResultMpgFailure().GetValue()) {
+                            if (!mpg_desc)
+                                mpg_desc = "UNKNOWN";
+                            fprintf(file, "mpg error: %s\n", mpg_desc);
+                        } else {
+                            fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                        }
+                        fclose(file);
                     }
-                    fclose(file);
                 }
                 has_next = false;
                 absolute_path[0] = '\0';
+
+                /* Finally pop track from queue. */
+                std::scoped_lock lk(g_queue_mutex);
+                if (!g_queue.empty())
+                    g_queue.pop();
+
             } else {
                 /* Nothing queued. Let's sleep. */
                 svcSleepThread(1'000'000'000ul);
