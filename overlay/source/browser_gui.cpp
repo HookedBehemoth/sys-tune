@@ -45,8 +45,6 @@ void BrowserGui::scanCwd() {
     IDirectory dir;
     Result rc = m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
     if (R_SUCCEEDED(rc)) {
-        /* DEBUG */
-        m_list->addItem(new SelectListItem("..", [&](const std::string &) { this->upCwd(); }));
         /* Iternate over directory. */
         for (const auto &elm : DirectoryIterator(&dir)) {
             /* Add directory entries. */

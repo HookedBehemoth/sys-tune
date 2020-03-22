@@ -27,8 +27,8 @@ namespace {
 
     double volume = 0;
 
-    const char *paused_desc = "\uE0E0  Play   \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
-    const char *playing_desc = "\uE0E0 Pause \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
+    const char *paused_desc = "\uE0E0  Play   \uE0E2  Stop  \uE0E3  Select  \uE0E5  Next";
+    const char *playing_desc = "\uE0E0 Pause \uE0E2  Stop  \uE0E3  Select  \uE0E5  Next";
     const char *current_desc = paused_desc;
 
     void FetchStatus() {
@@ -165,15 +165,15 @@ bool ControlGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition,
         return true;
     }
 
-    if (keysDown & KEY_DUP) {
+    if (keysDown & KEY_DRIGHT) {
         musicSetVolume(volume + 0.05);
     }
 
-    if (keysDown & KEY_DDOWN) {
+    if (keysDown & KEY_DLEFT) {
         musicSetVolume(volume - 0.05);
     }
 
-    if (keysDown & KEY_DRIGHT) {
+    if (keysDown & KEY_R || keysDown & KEY_ZR) {
         musicSetStatus(MusicPlayerStatus_Next);
         return true;
     }
