@@ -14,6 +14,8 @@ namespace ams::music {
     Result GetQueueCountImpl(u32 *out);
     Result GetCurrentImpl(char *out_path, size_t out_path_length);
     Result GetListImpl(char *out_path, size_t out_path_length, u32 *out);
+    Result GetCurrentLengthImpl(double *out);
+    Result GetCurrentProgressImpl(double *out);
 
     Result AddToQueueImpl(const char *path, size_t path_length);
     Result ClearImpl();

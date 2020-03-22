@@ -8,9 +8,9 @@ namespace {
     constexpr const char *const status_descriptions[] = {
         "\u25A0",
         "\u25B6",
-        "\u2590\u2590",
+        " \u0406\u0406",
         "\u25B6\u25B6",
-        "\uE150",
+        "\uE098",
     };
 
     u32 count;
@@ -20,6 +20,9 @@ namespace {
     const char *status_desc = nullptr;
     constexpr const size_t path_buffer_size = FS_MAX_PATH * 10;
     char path_buffer[path_buffer_size];
+
+    double percentage;
+    char progress_text[0x20] = " 0:00/ 0:00";
 
     const char *paused_desc = "\uE0E0  Play   \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
     const char *playing_desc = "\uE0E0 Pause \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
@@ -65,6 +68,20 @@ namespace {
         }
     }
 
+#define MIN(val) (int)val / 60
+#define SEC(val) (int)val % 60
+
+    void FetchProgress() {
+        double length = 0;
+        double progress = 0;
+        if (R_SUCCEEDED(musicGetCurrentLength(&length)) && R_SUCCEEDED(musicGetCurrentProgress(&progress))) {
+            std::snprintf(progress_text, 0x20, "%2d:%02d/%2d:%02d", MIN(progress), SEC(progress), MIN(length), SEC(length));
+            percentage = progress / length;
+        } else {
+            percentage = 0.0;
+        }
+    }
+
 }
 
 ControlGui::ControlGui()
@@ -83,10 +100,11 @@ tsl::elm::Element *ControlGui::createUI() {
                 drawer->drawString(status_desc, false, 15, 220, 20, 0xffff);
             }
             /* Progress bar */
-            drawer->drawRect(50, 212, tsl::cfg::FramebufferWidth - 180, 2, 0xffff);
-            drawer->drawRect(50, 210, 100, 6, 0xf00f);
+            u32 bar_length = tsl::cfg::FramebufferWidth - 180;
+            drawer->drawRect(50, 212, bar_length, 2, 0xffff);
+            drawer->drawRect(50, 210, bar_length * percentage, 6, 0xf00f);
             /* Song length */
-            drawer->drawString("1:30/2:32", false, 330, 220, 20, 0xffff);
+            drawer->drawString(progress_text, false, 330, 220, 20, 0xffff);
         }
         /* Query list */
         m_list.draw(drawer);
@@ -103,6 +121,7 @@ void ControlGui::update() {
         FetchStatus();
         FetchCurrent();
         FetchQueue(&this->m_list);
+        FetchProgress();
         count = 0;
     }
 }

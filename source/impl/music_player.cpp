@@ -25,6 +25,8 @@ namespace ams::music {
         std::string g_current;
         std::queue<std::string> g_queue;
         std::atomic<PlayerStatus> g_status;
+        std::atomic<double> g_length;
+        std::atomic<double> g_progress;
         os::Mutex g_queue_mutex;
 
         mpg123_handle *music_handle = nullptr;
@@ -57,8 +59,18 @@ namespace ams::music {
             MPG_TRY(mpg123_format_none(music_handle));
             MPG_TRY(mpg123_format(music_handle, rate, channels, encoding));
 
-            off_t length_samp = mpg123_length(music_handle);
-            R_UNLESS(length_samp != MPG123_ERR, ResultMpgFailure());
+            /* Get length of track in frames. */
+            off_t frame_length = mpg123_framelength(music_handle);
+            R_UNLESS(frame_length != MPG123_ERR, ResultMpgFailure());
+
+            /* Get length of frame in seconds. */
+            double tpf = mpg123_tpf(music_handle);
+            R_UNLESS(tpf >= 0, ResultMpgFailure());
+
+            /* Multiply to get length of track. */
+            g_length = tpf * frame_length;
+            ON_SCOPE_EXIT { g_length = 0; };
+            ON_SCOPE_EXIT { g_progress = 0; };
 
             size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
@@ -134,6 +146,11 @@ namespace ams::music {
                 }
                 /* Append the decoded audio buffer. */
                 R_TRY(audoutAppendAudioOutBuffer(&audio_buffer[index]));
+
+                /* Check progress in track. */
+                off_t frame = mpg123_tellframe(music_handle);
+                R_UNLESS(tpf >= 0, ResultMpgFailure());
+                g_progress = tpf * frame;
 
                 /* Wait for the last buffer to stop playing. */
                 AudioOutBuffer *released;
@@ -277,6 +294,24 @@ namespace ams::music {
             tmp++;
         }
         *out = tmp;
+
+        return ResultSuccess();
+    }
+
+    Result GetCurrentLengthImpl(double *out) {
+        double length = g_length;
+        R_UNLESS(length >= 0, ResultNotPlaying());
+
+        *out = length;
+
+        return ResultSuccess();
+    }
+
+    Result GetCurrentProgressImpl(double *out) {
+        double progress = g_progress;
+        R_UNLESS(progress >= 0, ResultNotPlaying());
+
+        *out = progress;
 
         return ResultSuccess();
     }

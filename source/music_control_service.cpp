@@ -24,6 +24,14 @@ namespace ams::music {
         return GetListImpl(reinterpret_cast<char *>(out_path.GetPointer()), out_path.GetSize(), out.GetPointer());
     }
 
+    Result ControlService::GetCurrentLength(sf::Out<double> out) {
+        return GetCurrentLengthImpl(out.GetPointer());
+    }
+
+    Result ControlService::GetCurrentProgress(sf::Out<double> out) {
+        return GetCurrentProgressImpl(out.GetPointer());
+    }
+
     Result ControlService::AddToQueue(sf::InBuffer path) {
         return AddToQueueImpl(reinterpret_cast<const char *>(path.GetPointer()), path.GetSize());
     }

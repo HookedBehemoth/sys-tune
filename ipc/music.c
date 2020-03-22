@@ -62,6 +62,20 @@ Result musicGetList(u32 *read, char *out_path, size_t out_path_length) {
     return rc;
 }
 
+Result musicGetCurrentLength(double *out) {
+    double tmp;
+    Result rc = serviceDispatchOut(&g_music, 5, tmp);
+    if (R_SUCCEEDED(rc) && out) *out = tmp;
+    return rc;
+}
+
+Result musicGetCurrentProgress(double *out) {
+    double tmp;
+    Result rc = serviceDispatchOut(&g_music, 6, tmp);
+    if (R_SUCCEEDED(rc) && out) *out = tmp;
+    return rc;
+}
+
 Result musicAddToQueue(const char *path) {
     size_t path_length = strlen(path);
     return serviceDispatch(&g_music, 10,

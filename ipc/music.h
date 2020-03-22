@@ -52,6 +52,20 @@ Result musicGetCurrent(char *out_path, size_t out_path_length);
 Result musicGetList(u32 *read, char *out_path, size_t out_path_length);
 
 /**
+ * @brief Get length of current track.
+ * @note Will only work if song is running or paused while running.
+ * @param[out] out Length in seconds.
+ */
+Result musicGetCurrentLength(double *out);
+
+/**
+ * @brief Get progress of current track.
+ * @note Will only work if song is running or paused while running.
+ * @param[out] out Progress in seconds from start.
+ */
+Result musicGetCurrentProgress(double *out);
+
+/**
  * @brief Add track to queue.
  * @note Must not include leading mount name.
  * @note Must match ^(/.*.mp3)$
