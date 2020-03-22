@@ -66,6 +66,18 @@ Result musicGetCurrentLength(double *out);
 Result musicGetCurrentProgress(double *out);
 
 /**
+ * @brief Get the current decode volume.
+ * @param[out] out volume value (linear factor).
+ */
+Result musicGetVolume(double *out);
+
+/**
+ * @brief Set the current decode volume.
+ * @param[in] volume volume value (linear factor).
+ */
+Result musicSetVolume(double volume);
+
+/**
  * @brief Add track to queue.
  * @note Must not include leading mount name.
  * @note Must match ^(/.*.mp3)$

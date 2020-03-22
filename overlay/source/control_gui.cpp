@@ -1,8 +1,8 @@
 #include "control_gui.hpp"
 
 #include "../../ipc/music.h"
-#include "music_ovl_frame.hpp"
 #include "browser_gui.hpp"
+#include "music_ovl_frame.hpp"
 
 namespace {
 
@@ -22,8 +22,10 @@ namespace {
     constexpr const size_t path_buffer_size = FS_MAX_PATH * 10;
     char path_buffer[path_buffer_size];
 
-    double percentage;
+    double percentage = 0;
     char progress_text[0x20] = " 0:00/ 0:00";
+
+    double volume = 0;
 
     const char *paused_desc = "\uE0E0  Play   \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
     const char *playing_desc = "\uE0E0 Pause \uE0E2  Stop  \uE0E3  Select  \uE0D4  Next";
@@ -69,6 +71,15 @@ namespace {
         }
     }
 
+    void FetchVolume() {
+        double tmp;
+        if (R_SUCCEEDED(musicGetVolume(&tmp))) {
+            volume = tmp;
+        } else {
+            volume = 0;
+        }
+    }
+
 #define MIN(val) (int)val / 60
 #define SEC(val) (int)val % 60
 
@@ -107,6 +118,10 @@ tsl::elm::Element *ControlGui::createUI() {
             /* Song length */
             drawer->drawString(progress_text, false, 330, 220, 20, 0xffff);
         }
+        /* Volume indicator. */
+        drawer->drawString("\uE13C", false, 280, 55, 30, 0xffff);
+        drawer->drawRect(315, 42, 100, 2, 0xffff);
+        drawer->drawRect(315, 40, 100 * volume, 6, 0xfff0);
         /* Query list */
         m_list.draw(drawer);
     });
@@ -123,6 +138,7 @@ void ControlGui::update() {
         FetchCurrent();
         FetchQueue(&this->m_list);
         FetchProgress();
+        FetchVolume();
         count = 0;
     }
 }
@@ -147,6 +163,14 @@ bool ControlGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition,
     if (keysDown & KEY_Y) {
         tsl::changeTo<BrowserGui>();
         return true;
+    }
+
+    if (keysDown & KEY_DUP) {
+        musicSetVolume(volume + 0.05);
+    }
+
+    if (keysDown & KEY_DDOWN) {
+        musicSetVolume(volume - 0.05);
     }
 
     if (keysDown & KEY_DRIGHT) {

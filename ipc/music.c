@@ -76,6 +76,17 @@ Result musicGetCurrentProgress(double *out) {
     return rc;
 }
 
+Result musicGetVolume(double *out) {
+    double tmp;
+    Result rc = serviceDispatchOut(&g_music, 7, tmp);
+    if (R_SUCCEEDED(rc) && out) *out = tmp;
+    return rc;
+}
+
+Result musicSetVolume(double volume) {
+    return serviceDispatchIn(&g_music, 8, volume);
+}
+
 Result musicAddToQueue(const char *path) {
     size_t path_length = strlen(path);
     return serviceDispatch(&g_music, 10,

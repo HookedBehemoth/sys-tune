@@ -25,8 +25,9 @@ namespace ams::music {
         std::string g_current;
         std::queue<std::string> g_queue;
         std::atomic<PlayerStatus> g_status;
-        std::atomic<double> g_length;
-        std::atomic<double> g_progress;
+        std::atomic<double> g_length = 0;
+        std::atomic<double> g_progress = 0;
+        std::atomic<double> g_volume = 0.3;
         os::Mutex g_queue_mutex;
 
         mpg123_handle *music_handle = nullptr;
@@ -47,7 +48,6 @@ namespace ams::music {
             /* Set parameters. */
             MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
             MPG_TRY(mpg123_param(music_handle, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
-            MPG_TRY(mpg123_volume(music_handle, 0.5));
 
             /* Open file. */
             MPG_TRY(mpg123_open(music_handle, path));
@@ -149,8 +149,11 @@ namespace ams::music {
 
                 /* Check progress in track. */
                 off_t frame = mpg123_tellframe(music_handle);
-                R_UNLESS(tpf >= 0, ResultMpgFailure());
+                R_UNLESS(frame >= 0, ResultMpgFailure());
                 g_progress = tpf * frame;
+
+                /* Set volume. */
+                MPG_TRY(mpg123_volume(music_handle, g_volume));
 
                 /* Wait for the last buffer to stop playing. */
                 AudioOutBuffer *released;
@@ -312,6 +315,25 @@ namespace ams::music {
         R_UNLESS(progress >= 0, ResultNotPlaying());
 
         *out = progress;
+
+        return ResultSuccess();
+    }
+
+    Result GetVolumeImpl(double *out) {
+        *out = g_volume;
+
+        return ResultSuccess();
+    }
+
+    Result SetVolumeImpl(double volume) {
+        /* Volume in range? */
+        if (volume < 0) {
+            volume = 0;
+        } else if (volume > 1) {
+            volume = 1;
+        }
+
+        g_volume = volume;
 
         return ResultSuccess();
     }
