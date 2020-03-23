@@ -6,7 +6,6 @@
 
 constexpr const char *const base_path = "/music/";
 
-const char *description = "   \uE0E1  Back     \uE0E0  Add";
 char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
@@ -26,7 +25,7 @@ BrowserGui::BrowserGui()
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
-    auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &description);
+    auto rootFrame = new MusicOverlayFrame("\uE0E1  Back     \uE0E0  Add");
 
     if (open) {
         this->scanCwd();

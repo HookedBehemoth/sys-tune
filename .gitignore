@@ -5,3 +5,4 @@
 *.ovl
 .vscode
 build
+gitversion.h

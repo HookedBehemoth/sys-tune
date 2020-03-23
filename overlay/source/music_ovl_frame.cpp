@@ -1,7 +1,7 @@
 #include "music_ovl_frame.hpp"
 
-MusicOverlayFrame::MusicOverlayFrame(const std::string &title, const std::string &subtitle, const char **description)
-    : Element(), m_title(title), m_subtitle(subtitle), m_description(description) {}
+MusicOverlayFrame::MusicOverlayFrame(const char *description)
+    : Element(), m_contentElement(), m_description(description) {}
 
 MusicOverlayFrame::~MusicOverlayFrame() {
     if (this->m_contentElement != nullptr)
@@ -11,11 +11,11 @@ MusicOverlayFrame::~MusicOverlayFrame() {
 void MusicOverlayFrame::draw(tsl::gfx::Renderer *renderer) {
     renderer->fillScreen(a({0x0, 0x0, 0x0, 0xD}));
 
-    renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
-    renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
+    renderer->drawString("ovl-tune \u266B", false, 20, 50, 30, a(0xFFFF));
+    renderer->drawString(VERSION, false, 20, 70, 15, a(0xFFFF));
 
     renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-    renderer->drawString(*this->m_description, false, 15, 693, 23, a(0xFFFF));
+    renderer->drawString(this->m_description, false, 15, 693, 23, a(0xFFFF));
 
     if (this->m_contentElement != nullptr)
         this->m_contentElement->frame(renderer);
@@ -47,4 +47,8 @@ void MusicOverlayFrame::setContent(tsl::elm::Element *content) {
         this->m_contentElement->setParent(this);
         this->invalidate();
     }
+}
+
+void MusicOverlayFrame::setDescription(const char *description) {
+    m_description = description;
 }

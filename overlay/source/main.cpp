@@ -26,9 +26,9 @@ class OverlayTest : public tsl::Overlay {
 
     virtual std::unique_ptr<tsl::Gui> loadInitialGui() override {
         if (!this->running) {
-            return std::make_unique<ErrorGui>("Music service not running");
+            return std::make_unique<ErrorGui>("sys-tune service not running!");
         } else if (R_FAILED(this->init_rc)) {
-            return std::make_unique<ErrorGui>(this->init_rc);
+            return std::make_unique<ErrorGui>("Something went wrong:", this->init_rc);
         } else {
             return std::make_unique<ControlGui>();
         }

@@ -5,10 +5,11 @@
 class ErrorGui : public tsl::Gui {
   private:
     const char *m_msg;
+    const char *m_result;
 
   public:
     ErrorGui(const char *msg);
-    ErrorGui(Result rc);
+    ErrorGui(const char *msg, Result rc);
 
     virtual tsl::elm::Element *createUI() override;
     virtual void update() override;

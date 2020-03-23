@@ -1,7 +1,6 @@
 #include "control_gui.hpp"
 
 #include "browser_gui.hpp"
-#include "music_ovl_frame.hpp"
 
 namespace {
 
@@ -26,7 +25,7 @@ namespace {
 }
 
 ControlGui::ControlGui()
-    : m_list(queue_size), m_status(MusicPlayerStatus_Stopped), m_current(), m_status_desc(), m_bottom_text(), m_progress_text(" 0:00/ 0:00"), m_percentage(), m_volume(), m_counter() {
+    : m_frame(), m_list(queue_size), m_status(MusicPlayerStatus_Stopped), m_current(), m_status_desc(), m_progress_text(" 0:00/ 0:00"), m_percentage(), m_volume(), m_counter() {
     if (R_FAILED(musicGetVolume(&this->m_volume)))
         this->m_volume = 0;
     if (R_FAILED(musicGetLoop(&this->m_loop)))
@@ -34,7 +33,7 @@ ControlGui::ControlGui()
 }
 
 tsl::elm::Element *ControlGui::createUI() {
-    auto rootFrame = new MusicOverlayFrame("Audioplayer \u266B", "v1.0.0", &this->m_bottom_text);
+    m_frame = new MusicOverlayFrame(stop_desc);
     this->m_list.setBoundaries(0, 200, tsl::cfg::FramebufferWidth, 470);
 
     auto *custom = new tsl::elm::CustomDrawer([&](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
@@ -64,9 +63,9 @@ tsl::elm::Element *ControlGui::createUI() {
         m_list.draw(drawer);
     });
 
-    rootFrame->setContent(custom);
+    m_frame->setContent(custom);
 
-    return rootFrame;
+    return m_frame;
 }
 
 void ControlGui::update() {
@@ -146,11 +145,11 @@ void ControlGui::FetchStatus() {
     this->m_status_desc = nullptr;
     if (R_SUCCEEDED(musicGetStatus(&this->m_status)) && this->m_status < 5) {
         if (this->m_status == MusicPlayerStatus_Playing) {
-            this->m_bottom_text = playing_desc;
+            this->m_frame->setDescription(playing_desc);
         } else if (m_status == MusicPlayerStatus_Paused) {
-            this->m_bottom_text = paused_desc;
+            this->m_frame->setDescription(paused_desc);
         } else {
-            this->m_bottom_text = stop_desc;
+            this->m_frame->setDescription(stop_desc);
         }
         this->m_status_desc = status_descriptions[this->m_status];
     }
