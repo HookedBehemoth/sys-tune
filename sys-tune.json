@@ -1,5 +1,5 @@
 {
-    "name":    "boot2",
+    "name":    "sys-tune",
     "title_id":    "0x4200000000000000",
     "title_id_range_min":    "0x4200000000000000",
     "title_id_range_max":    "0x4200000000000000",

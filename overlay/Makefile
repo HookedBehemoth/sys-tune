@@ -39,7 +39,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 APP_TITLE	:=	sys-tune overlay
 
-TARGET		:=	ovl-tune-overlay
+TARGET		:=	sys-tune-overlay
 BUILD		:=	build
 SOURCES		:=	source source/hos/fs ../ipc
 DATA		:=	data
