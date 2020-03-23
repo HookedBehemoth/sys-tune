@@ -28,7 +28,7 @@ namespace ams::music {
         std::string g_current;
         std::list<std::string> g_queue;
         std::atomic<PlayerStatus> g_status;
-        std::atomic<LoopStatus> g_loop = LoopStatus::Off;
+        std::atomic<LoopStatus> g_loop = LoopStatus::List;
         std::atomic<double> g_tpf = 0;
         std::atomic<double> g_total_frame_count = 0;
         std::atomic<double> g_progress_frame_count = 0;
@@ -192,12 +192,6 @@ namespace ams::music {
         bool has_next = false;
         char absolute_path[FS_MAX_PATH];
 
-        FILE *file = fopen("sdmc:/music.log", "a");
-        if (AMS_LIKELY(file)) {
-            fputs("Thread start\n", file);
-            fclose(file);
-        }
-
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_status != PlayerStatus::Exit) {
             /* Deque current track. */
@@ -212,12 +206,6 @@ namespace ams::music {
                 if (has_next) {
                     g_current = g_queue.front();
                     std::snprintf(absolute_path, FS_MAX_PATH, "sdmc:%s", g_current.c_str());
-
-                    file = fopen("sdmc:/music.log", "a");
-                    if (AMS_LIKELY(file)) {
-                        fprintf(file, "next song: %s\n", absolute_path);
-                        fclose(file);
-                    }
                 }
             }
             /* Only play if playing and we have a track queued. */
@@ -229,7 +217,7 @@ namespace ams::music {
 
                     /* Log error. */
                     if (R_FAILED(rc)) {
-                        file = fopen("sdmc:/music.log", "a");
+                        FILE *file = fopen("sdmc:/music.log", "a");
                         if (AMS_LIKELY(file)) {
                             if (rc.GetValue() == ResultMpgFailure().GetValue()) {
                                 if (!mpg_desc)
@@ -260,11 +248,42 @@ namespace ams::music {
                 svcSleepThread(1'000'000'000ul);
             }
         }
+    }
 
-        file = fopen("sdmc:/music.log", "a");
-        if (AMS_LIKELY(file)) {
-            fputs("Thread stop\n", file);
-            fclose(file);
+    void EventThreadFunc(void *) {
+        /* Aquire power button event handle. */
+        Event power_button_event = {};
+        Result rc = hidsysAcquireSleepButtonEventHandle(&power_button_event);
+        if (R_FAILED(rc))
+            return;
+        /* Cleanup event handle. */
+        ON_SCOPE_EXIT { eventClear(&power_button_event); };
+
+        GpioPadSession headphone_detect_session = {};
+        rc = gpioOpenSession(&headphone_detect_session, GpioPadName(0x15));
+        if (R_FAILED(rc))
+            return;
+        /* Close gpio session. */
+        ON_SCOPE_EXIT { gpioPadClose(&headphone_detect_session); };
+
+        /* [0] Low == plugged in; [1] High == not plugged in. */
+        GpioValue headphone_value = GpioValue_High;
+
+        /* During runtime listen to the event. */
+        while (g_status != PlayerStatus::Exit) {
+            if (R_SUCCEEDED(eventWait(&power_button_event, 100'000'000)))
+                g_status = PlayerStatus::Paused;
+
+            GpioValue tmp_value;
+            if (R_SUCCEEDED(gpioPadGetValue(&headphone_detect_session, &tmp_value))) {
+                if (headphone_value == GpioValue_Low && tmp_value == GpioValue_High) {
+                    g_status = PlayerStatus::Paused;
+                }
+                headphone_value = tmp_value;
+            }
+
+            /* Sleep */
+            svcSleepThread(100'000'000);
         }
     }
 

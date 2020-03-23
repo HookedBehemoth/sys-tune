@@ -52,6 +52,8 @@ void __appInit() {
     hos::SetVersionForLibnx();
 
     sm::DoWithSession([] {
+        R_ABORT_UNLESS(gpioInitialize());
+        R_ABORT_UNLESS(hidsysInitialize());
         R_ABORT_UNLESS(audoutInitialize());
         R_ABORT_UNLESS(fsInitialize());
     });
@@ -63,6 +65,8 @@ void __appExit(void) {
     fsdevUnmountAll();
     fsExit();
     audoutExit();
+    hidsysExit();
+    gpioExit();
 }
 
 namespace {
@@ -83,12 +87,19 @@ int main(int argc, char *argv[]) {
     audioThread.Initialize(music::ThreadFunc, nullptr, 0x10000, 0x20);
     audioThread.Start();
 
+    os::Thread eventThread;
+    eventThread.Initialize(music::EventThreadFunc, nullptr, 0x2000, 0x20);
+    eventThread.Start();
+
     /* Create services */
     R_ASSERT(g_server_manager.RegisterServer<music::ControlService>(MusicServiceName, MusicMaxSessions));
 
     g_server_manager.LoopProcess();
 
     music::Exit();
+
+    eventThread.Wait();
+    eventThread.Join();
 
     audioThread.Wait();
     audioThread.Join();

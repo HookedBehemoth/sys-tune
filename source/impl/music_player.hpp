@@ -8,6 +8,7 @@ namespace ams::music {
     void Exit();
 
     void ThreadFunc(void *);
+    void EventThreadFunc(void *);
 
     Result GetStatusImpl(PlayerStatus *out);
     Result SetStatusImpl(PlayerStatus status);
