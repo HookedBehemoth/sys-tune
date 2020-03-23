@@ -337,8 +337,8 @@ namespace ams::music {
         u32 tmp = 0;
         /* Traverse queue and write to buffer. */
         size_t remaining = out_path_length / FS_MAX_PATH;
-        for (const auto &elm : g_queue) {
-            std::strncpy(out_path, elm.c_str(), FS_MAX_PATH);
+        for (auto it = g_queue.cbegin(); it != g_queue.cend() && remaining; ++it) {
+            std::strncpy(out_path, it->c_str(), FS_MAX_PATH);
             out_path += FS_MAX_PATH;
             remaining--;
             tmp++;
