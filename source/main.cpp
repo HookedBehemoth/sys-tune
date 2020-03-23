@@ -36,10 +36,6 @@ namespace ams {
 
 using namespace ams;
 
-void __libnx_exception_handler(ThreadExceptionDump *ctx) {
-    CrashHandler(ctx);
-}
-
 void __libnx_initheap(void) {
     void *addr = nx_inner_heap;
     size_t size = nx_inner_heap_size;
