@@ -271,7 +271,7 @@ namespace ams::music {
 
         /* During runtime listen to the event. */
         while (g_status != PlayerStatus::Exit) {
-            if (R_SUCCEEDED(eventWait(&power_button_event, 100'000'000)))
+            if (R_SUCCEEDED(eventWait(&power_button_event, 20'000'000)))
                 g_status = PlayerStatus::Paused;
 
             GpioValue tmp_value;
@@ -283,7 +283,7 @@ namespace ams::music {
             }
 
             /* Sleep */
-            svcSleepThread(100'000'000);
+            svcSleepThread(20'000'000);
         }
     }
 
