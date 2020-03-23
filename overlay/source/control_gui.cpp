@@ -25,8 +25,11 @@ namespace {
 }
 
 ControlGui::ControlGui()
-    : m_list(queue_size), m_status(MusicPlayerStatus_Stopped), m_counter(), m_current(), m_status_desc(), m_bottom_text(), m_progress_text(" 0:00/ 0:00"), m_percentage(), m_volume() {
-    FetchVolume();
+    : m_list(queue_size), m_status(MusicPlayerStatus_Stopped), m_current(), m_status_desc(), m_bottom_text(), m_progress_text(" 0:00/ 0:00"), m_percentage(), m_volume(), m_counter() {
+    if (R_FAILED(musicGetVolume(&this->m_volume)))
+        this->m_volume = 0;
+    if (R_FAILED(musicGetLoop(&this->m_loop)))
+        this->m_loop = MusicLoopStatus_Off;
 }
 
 tsl::elm::Element *ControlGui::createUI() {
@@ -40,17 +43,22 @@ tsl::elm::Element *ControlGui::createUI() {
         drawer->drawRect(315, 40, 100 * this->m_volume, 6, 0xfff0);
         /* Current track and progress bar. */
         if (this->m_current) {
-            drawer->drawString(this->m_current, false, 15, 115, 20, 0xffff);
+            drawer->drawString(this->m_current, false, 15, 115, 24, 0xffff, 418);
             if (this->m_status_desc) {
                 drawer->drawString(this->m_status_desc, false, 15, 170, 20, 0xffff);
             }
             /* Progress bar */
-            u32 bar_length = tsl::cfg::FramebufferWidth - 200;
+            u32 bar_length = tsl::cfg::FramebufferWidth - 220;
             drawer->drawRect(50, 162, bar_length, 2, 0xffff);
             drawer->drawRect(50, 160, bar_length * this->m_percentage, 6, 0xf00f);
             /* Song length */
-            drawer->drawString(this->m_progress_text, false, 310, 170, 20, 0xffff);
+            drawer->drawString(this->m_progress_text, false, 290, 170, 20, 0xffff);
         }
+        /* Loop indicator */
+        auto loop_color = this->m_loop ? 0xfcc0 : 0xfccc;
+        drawer->drawString("\uE08E", true, 410, 175, 30, loop_color);
+        if (this->m_loop == MusicLoopStatus_Single)
+            drawer->drawString("1", true, 419, 167, 12, 0xfff0);
         /* Query list */
         m_list.draw(drawer);
     });
@@ -63,9 +71,8 @@ tsl::elm::Element *ControlGui::createUI() {
 void ControlGui::update() {
     if ((this->m_counter % 15) == 0) {
         this->FetchStatus();
-        this->FetchCurrentSong();
+        this->FetchCurrentTune();
         this->FetchQueue();
-        this->FetchProgress();
         this->m_counter = 0;
     }
     this->m_counter++;
@@ -101,6 +108,7 @@ bool ControlGui::handleInput(u64 keysDown, u64 keysHeld, touchPosition, Joystick
             musicSetVolume(this->m_volume);
             r_held = 0;
         }
+        return true;
     }
 
     static u32 l_held = 0;
@@ -111,6 +119,18 @@ bool ControlGui::handleInput(u64 keysDown, u64 keysHeld, touchPosition, Joystick
             musicSetVolume(this->m_volume);
             l_held = 0;
         }
+        return true;
+    }
+
+    if (keysDown & KEY_DUP) {
+        this->m_loop = MusicLoopStatus((this->m_loop + 1) % 3);
+        musicSetLoop(this->m_loop);
+        return true;
+    }
+
+    if (keysDown & KEY_DDOWN) {
+        musicShuffle();
+        return true;
     }
 
     if (keysDown & KEY_R || keysDown & KEY_ZR) {
@@ -133,9 +153,19 @@ void ControlGui::FetchStatus() {
     }
 }
 
-void ControlGui::FetchCurrentSong() {
+#define MIN(val) (int)val / 60
+#define SEC(val) (int)val % 60
+
+void ControlGui::FetchCurrentTune() {
     this->m_current = nullptr;
-    if (R_SUCCEEDED(musicGetCurrent(path_buffer, FS_MAX_PATH))) {
+    MusicCurrentTune current_tune;
+    if (R_SUCCEEDED(musicGetCurrent(path_buffer, FS_MAX_PATH, &current_tune))) {
+        this->m_volume = current_tune.volume;
+        /* Progress text and bar */
+        double total = current_tune.tpf * current_tune.total_frame_count;
+        double progress = current_tune.tpf * current_tune.progress_frame_count;
+        std::snprintf(this->m_progress_text, 0x20, "%2d:%02d/%2d:%02d", MIN(progress), SEC(progress), MIN(total), SEC(total));
+        this->m_percentage = progress / total;
         /* Only show file name. Ignore path to file and extension. */
         size_t length = std::strlen(path_buffer);
         path_buffer[length - 4] = '\0';
@@ -152,7 +182,7 @@ void ControlGui::FetchCurrentSong() {
 void ControlGui::FetchQueue() {
     this->m_list.clear();
     u32 count;
-    if (R_SUCCEEDED(musicGetList(&count, queue_buffer, queue_buffer_size))) {
+    if (R_SUCCEEDED(musicListTunes(&count, queue_buffer, queue_buffer_size))) {
         if (count > 0 && count <= queue_size) {
             /* Only show file name. Ignore path to file and extension. */
             char *ptr = queue_buffer;
@@ -174,28 +204,5 @@ void ControlGui::FetchQueue() {
         }
     } else {
         this->m_list.addItem(new tsl::elm::ListItem("Failed to get queue!"));
-    }
-}
-
-void ControlGui::FetchVolume() {
-    double tmp;
-    if (R_SUCCEEDED(musicGetVolume(&tmp))) {
-        this->m_volume = tmp;
-    } else {
-        this->m_volume = 0;
-    }
-}
-
-#define MIN(val) (int)val / 60
-#define SEC(val) (int)val % 60
-
-void ControlGui::FetchProgress() {
-    double length = 0;
-    double progress = 0;
-    if (R_SUCCEEDED(musicGetCurrentLength(&length)) && R_SUCCEEDED(musicGetCurrentProgress(&progress))) {
-        std::snprintf(this->m_progress_text, 0x20, "%2d:%02d/%2d:%02d", MIN(progress), SEC(progress), MIN(length), SEC(length));
-        this->m_percentage = progress / length;
-    } else {
-        this->m_percentage = 0.0;
     }
 }

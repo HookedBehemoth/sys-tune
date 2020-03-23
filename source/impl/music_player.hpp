@@ -11,15 +11,17 @@ namespace ams::music {
 
     Result GetStatusImpl(PlayerStatus *out);
     Result SetStatusImpl(PlayerStatus status);
-    Result GetQueueCountImpl(u32 *out);
-    Result GetCurrentImpl(char *out_path, size_t out_path_length);
-    Result GetListImpl(char *out_path, size_t out_path_length, u32 *out);
-    Result GetCurrentLengthImpl(double *out);
-    Result GetCurrentProgressImpl(double *out);
     Result GetVolumeImpl(double *out);
     Result SetVolumeImpl(double volume);
+    Result GetLoopImpl(LoopStatus *out);
+    Result SetLoopImpl(LoopStatus loop);
+
+    Result GetCurrentImpl(char *out_path, size_t out_path_length, CurrentTune *out);
+    Result CountTunesImpl(u32 *out);
+    Result ListTunesImpl(char *out_path, size_t out_path_length, u32 *out);
 
     Result AddToQueueImpl(const char *path, size_t path_length);
     Result ClearImpl();
+    Result ShuffleImpl();
 
 }

@@ -13,6 +13,19 @@ typedef enum {
     MusicPlayerStatus_Next,
 } MusicPlayerStatus;
 
+typedef enum {
+    MusicLoopStatus_Off,
+    MusicLoopStatus_List,
+    MusicLoopStatus_Single,
+} MusicLoopStatus;
+
+typedef struct {
+    double volume;
+    double tpf;
+    double total_frame_count;
+    double progress_frame_count;
+} MusicCurrentTune;
+
 bool musicIsRunning();
 
 Result musicInitialize();
@@ -20,7 +33,7 @@ Result musicInitialize();
 void musicExit();
 
 /**
- * @brief returns the current status of playback.
+ * @brief Get the current status of playback.
  * @param[out] status \ref MusicPlayerStatus
  */
 Result musicGetStatus(MusicPlayerStatus *status);
@@ -32,16 +45,42 @@ Result musicGetStatus(MusicPlayerStatus *status);
 Result musicSetStatus(MusicPlayerStatus status);
 
 /**
- * @brief Get the current queue size.
- * @param[out] count remaining tracks after current.
+ * @brief Get the current decode volume.
+ * @param[out] out volume value (linear factor).
  */
-Result musicGetQueueCount(u32 *count);
+Result musicGetVolume(double *out);
+
+/**
+ * @brief Set the decode volume.
+ * @param[in] volume volume value (linear factor).
+ */
+Result musicSetVolume(double volume);
+
+/**
+ * @brief Get the current loop status.
+ * @param[out] out Is looping enabled?
+ */
+Result musicGetLoop(MusicLoopStatus *out);
+
+/**
+ * @brief Enable or disable looping.
+ * @param[in] loop Whether to loop or not.
+ */
+Result musicSetLoop(MusicLoopStatus loop);
 
 /**
  * @brief Get current song.
  * @param[out] out_path Path to current playing song.
+ * @param[in] out_path_length Size of the out_path buffer. Needs to be at least FS_MAX_PATH.
+ * @param[out] out \ref MusicCurrentTune
  */
-Result musicGetCurrent(char *out_path, size_t out_path_length);
+Result musicGetCurrent(char *out_path, size_t out_path_length, MusicCurrentTune *out);
+
+/**
+ * @brief Get the current queue size.
+ * @param[out] count remaining tracks after current.
+ */
+Result musicCountTunes(u32 *count);
 
 /**
  * @brief Read queue.
@@ -49,33 +88,7 @@ Result musicGetCurrent(char *out_path, size_t out_path_length);
  * @param[out] out_path Path array FS_MAX_PATH * n
  * @param[in] out_path_length Size of the supplied path array.
  */
-Result musicGetList(u32 *read, char *out_path, size_t out_path_length);
-
-/**
- * @brief Get length of current track.
- * @note Will only work if song is running or paused while running.
- * @param[out] out Length in seconds.
- */
-Result musicGetCurrentLength(double *out);
-
-/**
- * @brief Get progress of current track.
- * @note Will only work if song is running or paused while running.
- * @param[out] out Progress in seconds from start.
- */
-Result musicGetCurrentProgress(double *out);
-
-/**
- * @brief Get the current decode volume.
- * @param[out] out volume value (linear factor).
- */
-Result musicGetVolume(double *out);
-
-/**
- * @brief Set the current decode volume.
- * @param[in] volume volume value (linear factor).
- */
-Result musicSetVolume(double volume);
+Result musicListTunes(u32 *read, char *out_path, size_t out_path_length);
 
 /**
  * @brief Add track to queue.
@@ -89,6 +102,11 @@ Result musicAddToQueue(const char *path);
  * @brief Clear queue.
  */
 Result musicClear();
+
+/**
+ * @brief Shuffle queue.
+ */
+Result musicShuffle();
 
 #ifdef __cplusplus
 }

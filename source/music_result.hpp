@@ -8,6 +8,7 @@ namespace ams::music {
 
     R_DEFINE_ERROR_RESULT(InvalidArgument, 1);
     R_DEFINE_ERROR_RESULT(InvalidPath, 2);
+    R_DEFINE_ERROR_RESULT(InvalidStatus, 3);
     R_DEFINE_ERROR_RESULT(QueueEmpty, 10);
     R_DEFINE_ERROR_RESULT(NotPlaying, 11);
     R_DEFINE_ERROR_RESULT(MpgFailure, 20);

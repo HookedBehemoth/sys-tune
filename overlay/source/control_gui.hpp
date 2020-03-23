@@ -7,13 +7,14 @@ class ControlGui : public tsl::Gui {
   private:
     tsl::elm::List m_list;
     MusicPlayerStatus m_status;
-    u32 m_counter;
+    MusicLoopStatus m_loop;
     const char *m_current;
     const char *m_status_desc;
     const char *m_bottom_text;
     char m_progress_text[0x20];
     double m_percentage;
     double m_volume;
+    u32 m_counter;
 
   public:
     ControlGui();
@@ -25,8 +26,7 @@ class ControlGui : public tsl::Gui {
 
   private:
     void FetchStatus();
-    void FetchCurrentSong();
+    void FetchCurrentTune();
     void FetchQueue();
     void FetchVolume();
-    void FetchProgress();
 };

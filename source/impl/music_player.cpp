@@ -3,9 +3,11 @@
 #include "../music_result.hpp"
 
 #include <atomic>
+#include <list>
 #include <malloc.h>
 #include <mpg123.h>
-#include <queue>
+#include <numeric>
+#include <random>
 #include <regex>
 #include <string>
 
@@ -22,11 +24,14 @@ namespace ams::music {
 
     namespace {
 
+        std::mt19937 urng;
         std::string g_current;
-        std::queue<std::string> g_queue;
+        std::list<std::string> g_queue;
         std::atomic<PlayerStatus> g_status;
-        std::atomic<double> g_length = 0;
-        std::atomic<double> g_progress = 0;
+        std::atomic<LoopStatus> g_loop = LoopStatus::Off;
+        std::atomic<double> g_tpf = 0;
+        std::atomic<double> g_total_frame_count = 0;
+        std::atomic<double> g_progress_frame_count = 0;
         std::atomic<double> g_volume = 0.2;
         os::Mutex g_queue_mutex;
 
@@ -60,17 +65,19 @@ namespace ams::music {
             MPG_TRY(mpg123_format(music_handle, rate, channels, encoding));
 
             /* Get length of track in frames. */
-            off_t frame_length = mpg123_framelength(music_handle);
-            R_UNLESS(frame_length != MPG123_ERR, ResultMpgFailure());
+            off_t frame_count = mpg123_framelength(music_handle);
+            R_UNLESS(frame_count != MPG123_ERR, ResultMpgFailure());
+            g_total_frame_count = frame_count;
 
             /* Get length of frame in seconds. */
             double tpf = mpg123_tpf(music_handle);
             R_UNLESS(tpf >= 0, ResultMpgFailure());
+            g_tpf = tpf;
 
-            /* Multiply to get length of track. */
-            g_length = tpf * frame_length;
-            ON_SCOPE_EXIT { g_length = 0; };
-            ON_SCOPE_EXIT { g_progress = 0; };
+            /* Reset frame information on exit. */
+            ON_SCOPE_EXIT { g_tpf = 0; };
+            ON_SCOPE_EXIT { g_total_frame_count = 0; };
+            ON_SCOPE_EXIT { g_progress_frame_count = 0; };
 
             size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
@@ -119,7 +126,7 @@ namespace ams::music {
             /* Read initial buffer. */
             MPG_TRY(mpg123_read(music_handle, (u8 *)audio_buffer[0].buffer, buffer_size, &done));
             audio_buffer[0].data_size = done;
-            /* Applend buffer. */
+            /* Append buffer. */
             R_TRY(audoutAppendAudioOutBuffer(&audio_buffer[0]));
 
             size_t index = 1;
@@ -153,7 +160,7 @@ namespace ams::music {
                 /* Check progress in track. */
                 off_t frame = mpg123_tellframe(music_handle);
                 R_UNLESS(frame >= 0, ResultMpgFailure());
-                g_progress = tpf * frame;
+                g_progress_frame_count = frame;
 
                 /* Set volume. */
                 MPG_TRY(mpg123_volume(music_handle, g_volume / 2));
@@ -171,6 +178,9 @@ namespace ams::music {
     }
 
     void Initialize() {
+        u64 seed[2];
+        envGetRandomSeed(seed);
+        urng = std::mt19937(seed[0]);
         g_status = PlayerStatus::Stopped;
     }
 
@@ -213,29 +223,37 @@ namespace ams::music {
             /* Only play if playing and we have a track queued. */
             if (g_status == PlayerStatus::Playing && has_next) {
                 const char *mpg_desc = nullptr;
-                Result rc = ThreadFuncImpl(&mpg_desc, absolute_path);
 
-                /* Log error. */
-                if (R_FAILED(rc)) {
-                    file = fopen("sdmc:/music.log", "a");
-                    if (AMS_LIKELY(file)) {
-                        if (rc.GetValue() == ResultMpgFailure().GetValue()) {
-                            if (!mpg_desc)
-                                mpg_desc = "UNKNOWN";
-                            fprintf(file, "mpg error: %s\n", mpg_desc);
-                        } else {
-                            fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                do {
+                    Result rc = ThreadFuncImpl(&mpg_desc, absolute_path);
+
+                    /* Log error. */
+                    if (R_FAILED(rc)) {
+                        file = fopen("sdmc:/music.log", "a");
+                        if (AMS_LIKELY(file)) {
+                            if (rc.GetValue() == ResultMpgFailure().GetValue()) {
+                                if (!mpg_desc)
+                                    mpg_desc = "UNKNOWN";
+                                fprintf(file, "mpg error: %s\n", mpg_desc);
+                            } else {
+                                fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                            }
+                            fclose(file);
                         }
-                        fclose(file);
                     }
-                }
+                } while (g_loop == LoopStatus::Single && g_status == PlayerStatus::Playing);
+
                 has_next = false;
                 absolute_path[0] = '\0';
 
                 /* Finally pop track from queue. */
                 std::scoped_lock lk(g_queue_mutex);
-                if (!g_queue.empty())
-                    g_queue.pop();
+                if (!g_queue.empty()) {
+                    auto front = g_queue.front();
+                    g_queue.pop_front();
+                    if (g_loop == LoopStatus::List)
+                        g_queue.push_back(front);
+                }
 
             } else {
                 /* Nothing queued. Let's sleep. */
@@ -260,68 +278,6 @@ namespace ams::music {
         return ResultSuccess();
     }
 
-    Result GetQueueCountImpl(u32 *out) {
-        *out = g_queue.size();
-        return ResultSuccess();
-    }
-
-    Result GetCurrentImpl(char *out_path, size_t out_path_length) {
-        std::scoped_lock lk(g_queue_mutex);
-
-        /* Make sure queue isn't empty. */
-        R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
-
-        const auto &next = g_queue.front();
-
-        /* Path length sufficient? */
-        R_UNLESS(out_path_length >= next.length(), ResultInvalidArgument());
-        std::strcpy(out_path, next.c_str());
-
-        return ResultSuccess();
-    }
-
-    Result GetListImpl(char *out_path, size_t out_path_length, u32 *out) {
-        /* Make copy of our queue. */
-        std::queue<std::string> queue_copy;
-        {
-            std::scoped_lock lk(g_queue_mutex);
-            queue_copy = g_queue;
-        }
-
-        u32 tmp = 0;
-        /* Traverse queue and write to buffer. */
-        size_t remaining = out_path_length / FS_MAX_PATH;
-        while (!queue_copy.empty() && remaining) {
-            const auto &next = queue_copy.front();
-            std::strncpy(out_path, next.c_str(), FS_MAX_PATH);
-            queue_copy.pop();
-            out_path += FS_MAX_PATH;
-            remaining--;
-            tmp++;
-        }
-        *out = tmp;
-
-        return ResultSuccess();
-    }
-
-    Result GetCurrentLengthImpl(double *out) {
-        double length = g_length;
-        R_UNLESS(length >= 0, ResultNotPlaying());
-
-        *out = length;
-
-        return ResultSuccess();
-    }
-
-    Result GetCurrentProgressImpl(double *out) {
-        double progress = g_progress;
-        R_UNLESS(progress >= 0, ResultNotPlaying());
-
-        *out = progress;
-
-        return ResultSuccess();
-    }
-
     Result GetVolumeImpl(double *out) {
         *out = g_volume;
 
@@ -341,6 +297,57 @@ namespace ams::music {
         return ResultSuccess();
     }
 
+    Result GetLoopImpl(LoopStatus *out) {
+        *out = g_loop;
+
+        return ResultSuccess();
+    }
+
+    Result SetLoopImpl(LoopStatus loop) {
+        g_loop = loop;
+
+        return ResultSuccess();
+    }
+
+    Result GetCurrentImpl(char *out_path, size_t out_path_length, CurrentTune *out) {
+        R_UNLESS(out_path_length >= FS_MAX_PATH, ResultInvalidArgument());
+
+        out->volume = g_volume;
+        out->tpf = g_tpf;
+        out->total_frame_count = g_total_frame_count;
+        out->progress_frame_count = g_progress_frame_count;
+
+        std::scoped_lock lk(g_queue_mutex);
+        R_UNLESS(!g_queue.empty(), ResultQueueEmpty());
+        const char *ptr = g_queue.front().c_str();
+        R_UNLESS(ptr, ResultNotPlaying());
+        std::strcpy(out_path, ptr);
+
+        return ResultSuccess();
+    }
+
+    Result CountTunesImpl(u32 *out) {
+        *out = g_queue.size();
+        return ResultSuccess();
+    }
+
+    Result ListTunesImpl(char *out_path, size_t out_path_length, u32 *out) {
+        std::scoped_lock lk(g_queue_mutex);
+
+        u32 tmp = 0;
+        /* Traverse queue and write to buffer. */
+        size_t remaining = out_path_length / FS_MAX_PATH;
+        for (const auto &elm : g_queue) {
+            std::strncpy(out_path, elm.c_str(), FS_MAX_PATH);
+            out_path += FS_MAX_PATH;
+            remaining--;
+            tmp++;
+        }
+        *out = tmp;
+
+        return ResultSuccess();
+    }
+
     Result AddToQueueImpl(const char *path, size_t path_length) {
         /* At root. */
         R_UNLESS(path[0] == '/', ResultInvalidPath());
@@ -350,7 +357,7 @@ namespace ams::music {
         std::scoped_lock lk(g_queue_mutex);
 
         /* Add song to queue. */
-        g_queue.push(path);
+        g_queue.push_back(path);
 
         return ResultSuccess();
     }
@@ -359,7 +366,28 @@ namespace ams::music {
         std::scoped_lock lk(g_queue_mutex);
 
         while (!g_queue.empty())
-            g_queue.pop();
+            g_queue.pop_front();
+
+        return ResultSuccess();
+    }
+
+    Result ShuffleImpl() {
+        R_UNLESS(g_status == PlayerStatus::Stopped, ResultInvalidStatus());
+
+        std::scoped_lock lk(g_queue_mutex);
+
+        /* Reference list in random accessable vector. */
+        std::vector<std::reference_wrapper<const std::string>> shuffle_vect(g_queue.begin(), g_queue.end());
+        /* Shuffle reference vector. */
+        std::shuffle(shuffle_vect.begin(), shuffle_vect.end(), urng);
+
+        /* Create list in shuffled order. */
+        std::list<std::string> shuffled;
+        for (auto &ref : shuffle_vect)
+            shuffled.push_back(std::move(ref.get()));
+
+        /* Swap out unshuffled list. */
+        g_queue.swap(shuffled);
 
         return ResultSuccess();
     }
