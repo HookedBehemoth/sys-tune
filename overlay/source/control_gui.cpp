@@ -15,6 +15,7 @@ namespace {
 
     constexpr const char *const paused_desc = "\uE0E0  Play   \uE0E2  Stop  \uE0E3  Select  \uE0E5  Next";
     constexpr const char *const playing_desc = "\uE0E0 Pause \uE0E2  Stop  \uE0E3  Select  \uE0E5  Next";
+    constexpr const char *const stop_desc = "\uE0E0  Play  \uE0D2 Shuffle \uE0E3  Select  \uE0E5  Next";
 
     char path_buffer[FS_MAX_PATH];
 
@@ -56,7 +57,7 @@ tsl::elm::Element *ControlGui::createUI() {
         }
         /* Loop indicator */
         auto loop_color = this->m_loop ? 0xfcc0 : 0xfccc;
-        drawer->drawString("\uE08E", true, 410, 175, 30, loop_color);
+        drawer->drawString("\uE08E", true, 407, 175, 30, loop_color);
         if (this->m_loop == MusicLoopStatus_Single)
             drawer->drawString("1", true, 419, 167, 12, 0xfff0);
         /* Query list */
@@ -146,8 +147,10 @@ void ControlGui::FetchStatus() {
     if (R_SUCCEEDED(musicGetStatus(&this->m_status)) && this->m_status < 5) {
         if (this->m_status == MusicPlayerStatus_Playing) {
             this->m_bottom_text = playing_desc;
-        } else {
+        } else if (m_status == MusicPlayerStatus_Paused) {
             this->m_bottom_text = paused_desc;
+        } else {
+            this->m_bottom_text = stop_desc;
         }
         this->m_status_desc = status_descriptions[this->m_status];
     }
