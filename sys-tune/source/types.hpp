@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stratosphere.hpp>
-#include "../ipc/music.h"
+#include "../../ipc/music.h"
 
 enum class PlayerStatus : u8 {
     Stopped,
