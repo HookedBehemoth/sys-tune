@@ -32,7 +32,7 @@ namespace ams::music {
         std::atomic<double> g_tpf = 0;
         std::atomic<double> g_total_frame_count = 0;
         std::atomic<double> g_progress_frame_count = 0;
-        std::atomic<double> g_volume = 0.2;
+        std::atomic<double> g_volume = 0.4;
         os::Mutex g_queue_mutex;
 
         mpg123_handle *music_handle = nullptr;
@@ -256,8 +256,9 @@ namespace ams::music {
         Result rc = hidsysAcquireSleepButtonEventHandle(&power_button_event);
         if (R_FAILED(rc))
             return;
+        eventClear(&power_button_event);
         /* Cleanup event handle. */
-        ON_SCOPE_EXIT { eventClear(&power_button_event); };
+        ON_SCOPE_EXIT { eventClose(&power_button_event); };
 
         GpioPadSession headphone_detect_session = {};
         rc = gpioOpenSession(&headphone_detect_session, GpioPadName(0x15));
