@@ -1048,7 +1048,7 @@ namespace tsl {
              * 
              * @param renderer 
              */
-            virtual void frame(gfx::Renderer *renderer) final {
+            virtual void frame(gfx::Renderer *renderer) {
                 if (this->m_focused)
                     this->drawHighlight(renderer);
 
