@@ -44,7 +44,7 @@ BUILD		:=	build
 SOURCES		:=	source source/hos/fs ../ipc
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc
-APP_VERSION	:=	0.7.0
+APP_VERSION	:=	0.8.0
 
 ifeq ($(RELEASE),)
 	APP_VERSION	:=	$(APP_VERSION)-$(shell git describe --dirty --always)
