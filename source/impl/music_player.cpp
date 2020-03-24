@@ -75,9 +75,11 @@ namespace ams::music {
             g_tpf = tpf;
 
             /* Reset frame information on exit. */
-            ON_SCOPE_EXIT { g_tpf = 0; };
-            ON_SCOPE_EXIT { g_total_frame_count = 0; };
-            ON_SCOPE_EXIT { g_progress_frame_count = 0; };
+            ON_SCOPE_EXIT {
+                g_tpf = 0;
+                g_total_frame_count = 0;
+                g_progress_frame_count = 0;
+            };
 
             size_t data_size = mpg123_outblock(music_handle);
             size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
@@ -250,17 +252,32 @@ namespace ams::music {
         }
     }
 
+    Result CheckSleep(PscPmModule *module) {
+        R_TRY(eventWait(&module->event, 100'000'000));
+        PscPmState state;
+        u32 flags;
+        R_TRY(pscPmModuleGetRequest(module, &state, &flags));
+        if (state == PscPmState_ReadySleep) {
+            g_status = PlayerStatus::Stopped;
+        }
+        R_TRY(pscPmModuleAcknowledge(module, state));
+        return ResultSuccess();
+    }
+
     void EventThreadFunc(void *) {
-        /* Aquire power button event handle. */
-        Event power_button_event = {};
-        Result rc = hidsysAcquireSleepButtonEventHandle(&power_button_event);
+        /* Register audio as our dependency so we can pause before it prepares for sleep. */
+        u16 dependencies[] = {PscPmModuleId_Audio};
+        /* Get pm module to listen for state change. */
+        PscPmModule pm_module;
+        Result rc = pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, 1, false);
         if (R_FAILED(rc))
             return;
-        eventClear(&power_button_event);
-        /* Cleanup event handle. */
-        ON_SCOPE_EXIT { eventClose(&power_button_event); };
+        ON_SCOPE_EXIT {
+            pscPmModuleFinalize(&pm_module);
+            pscPmModuleClose(&pm_module);
+        };
 
-        GpioPadSession headphone_detect_session = {};
+        GpioPadSession headphone_detect_session;
         rc = gpioOpenSession(&headphone_detect_session, GpioPadName(0x15));
         if (R_FAILED(rc))
             return;
@@ -272,8 +289,7 @@ namespace ams::music {
 
         /* During runtime listen to the event. */
         while (g_status != PlayerStatus::Exit) {
-            if (R_SUCCEEDED(eventWait(&power_button_event, 20'000'000)))
-                g_status = PlayerStatus::Paused;
+            CheckSleep(&pm_module);
 
             GpioValue tmp_value;
             if (R_SUCCEEDED(gpioPadGetValue(&headphone_detect_session, &tmp_value))) {

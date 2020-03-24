@@ -53,7 +53,7 @@ void __appInit() {
 
     sm::DoWithSession([] {
         R_ABORT_UNLESS(gpioInitialize());
-        R_ABORT_UNLESS(hidsysInitialize());
+        R_ABORT_UNLESS(pscmInitialize());
         R_ABORT_UNLESS(audoutInitialize());
         R_ABORT_UNLESS(fsInitialize());
     });
@@ -63,9 +63,10 @@ void __appInit() {
 
 void __appExit(void) {
     fsdevUnmountAll();
+
     fsExit();
     audoutExit();
-    hidsysExit();
+    pscmExit();
     gpioExit();
 }
 
