@@ -7,33 +7,17 @@
 class SelectListItem : public tsl::elm::ListItem {
   private:
     std::function<void(const std::string &text)> m_f;
-    u8 m_selectFactor;
 
   public:
     SelectListItem(const std::string &text, std::function<void(const std::string &text)> f)
-        : ListItem(text), m_f(f), m_selectFactor() {}
+        : ListItem(text), m_f(f) {}
 
     virtual ~SelectListItem() {}
 
-    void drawSelection(tsl::gfx::Renderer *renderer) {
-        renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, m_selectFactor, m_selectFactor, 0xf}));
-        --m_selectFactor;
-    }
-
-    virtual void frame(tsl::gfx::Renderer *renderer) override {
-        if (this->m_focused)
-            this->drawHighlight(renderer);
-
-        if (this->m_selectFactor)
-            this->drawSelection(renderer);
-
-        this->draw(renderer);
-    }
-
     virtual bool onClick(u64 keys) {
         if (keys & KEY_A) {
-            m_selectFactor = 0xf;
-            m_f(this->m_text);
+            this->m_selectFactor = tsl::style::ListItemHighlightLength;
+            this->m_f(this->m_text);
             return true;
         }
 

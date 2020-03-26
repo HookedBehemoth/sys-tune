@@ -13,15 +13,15 @@ BrowserGui::BrowserGui()
     FsFileSystem fs;
     Result rc = fsOpenSdCardFileSystem(&fs);
     if (R_SUCCEEDED(rc)) {
-        m_fs = IFileSystem(std::move(fs));
-        open = true;
+        this->m_fs = IFileSystem(std::move(fs));
+        this->open = true;
         IDirectory dir;
         if (R_SUCCEEDED(m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
             std::strcpy(this->cwd, base_path);
             this->has_music = true;
         }
     }
-    m_list = new tsl::elm::List(7);
+    this->m_list = new tsl::elm::List(7);
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
@@ -30,10 +30,10 @@ tsl::elm::Element *BrowserGui::createUI() {
     if (open) {
         this->scanCwd();
     } else {
-        m_list->addItem(new tsl::elm::ListItem("Couldn't open SdCard filesystem"));
+        this->m_list->addItem(new tsl::elm::ListItem("Couldn't open SdCard filesystem"));
     }
 
-    rootFrame->setContent(m_list);
+    rootFrame->setContent(this->m_list);
 
     return rootFrame;
 }
@@ -53,7 +53,7 @@ bool BrowserGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition,
 
 void BrowserGui::scanCwd() {
     tsl::Gui::removeFocus();
-    m_list->clear();
+    this->m_list->clear();
     /* Open directory. */
     IDirectory dir;
     Result rc = m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
@@ -62,21 +62,21 @@ void BrowserGui::scanCwd() {
         for (const auto &elm : DirectoryIterator(&dir)) {
             /* Add directory entries. */
             if (elm.type == FsDirEntryType_Dir) {
-                m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
+                this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
                     std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, text.c_str());
                     scanCwd();
                 }));
             } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
-                m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
+                this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
                     std::snprintf(path_buffer, FS_MAX_PATH, "%s%s", this->cwd, text.c_str());
                     musicAddToQueue(path_buffer);
                 }));
             }
         }
     } else {
-        m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
     }
-    tsl::Gui::requestFocus(m_list, tsl::FocusDirection::None);
+    tsl::Gui::requestFocus(this->m_list, tsl::FocusDirection::None);
 }
 
 void BrowserGui::upCwd() {

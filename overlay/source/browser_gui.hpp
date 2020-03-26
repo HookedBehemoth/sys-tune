@@ -16,7 +16,7 @@ class BrowserGui : public tsl::Gui {
 
     virtual tsl::elm::Element *createUI() override;
     virtual void update() override;
-    virtual bool handleInput(u64, u64, touchPosition, JoystickPosition, JoystickPosition) override;
+    virtual bool handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) override;
 
   private:
     void scanCwd();
