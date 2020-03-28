@@ -20,7 +20,7 @@ BrowserGui::BrowserGui()
             this->has_music = true;
         }
     }
-    this->m_list = new tsl::elm::List(7);
+    this->m_list = new tsl::elm::List();
 }
 
 tsl::elm::Element *BrowserGui::createUI() {

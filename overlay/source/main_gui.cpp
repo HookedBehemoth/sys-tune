@@ -28,7 +28,7 @@ MainGui::MainGui() : m_progress_text(" 0:00"), m_total_text(" 0:00") {
 
 tsl::elm::Element *MainGui::createUI() {
     auto *frame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
-    auto *list = new tsl::elm::List(4);
+    auto *list = new tsl::elm::List();
 
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
