@@ -37,6 +37,7 @@ tsl::elm::Element *ControlGui::createUI() {
     this->m_list.setBoundaries(0, 200, tsl::cfg::FramebufferWidth, 470);
 
     auto *custom = new tsl::elm::CustomDrawer([&](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
+        drawer->enableScissoring(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight);
         /* Volume indicator. */
         drawer->drawString("\uE13C", false, 280, 55, 30, 0xffff);
         drawer->drawRect(315, 42, 100, 2, 0xffff);
@@ -61,6 +62,8 @@ tsl::elm::Element *ControlGui::createUI() {
             drawer->drawString("1", true, 419, 167, 12, 0xfff0);
         /* Query list */
         m_list.draw(drawer);
+
+        drawer->disableScissoring();
     });
 
     m_frame->setContent(custom);

@@ -16,7 +16,7 @@ class SelectListItem : public tsl::elm::ListItem {
 
     virtual bool onClick(u64 keys) {
         if (keys & KEY_A) {
-            this->m_selectFactor = tsl::style::ListItemHighlightLength;
+            this->triggerClickAnimation();
             this->m_f(this->m_text);
             return true;
         }

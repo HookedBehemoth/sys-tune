@@ -25,7 +25,7 @@ BrowserGui::BrowserGui()
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
-    auto rootFrame = new MusicOverlayFrame("\uE0E1  Back     \uE0E0  Add");
+    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B",VERSION);
 
     if (open) {
         this->scanCwd();
