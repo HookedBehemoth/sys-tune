@@ -32,7 +32,7 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     if (this->m_text_width == 0) {
         /* Get base width. */
         auto [width, height] = renderer->drawString(this->m_current_track.data(), false, 0, 0, 26, tsl::style::color::ColorTransparent);
-        this->m_truncated = width > (this->getWidth() - 30);
+        this->m_truncated = static_cast<s32>(width) > (this->getWidth() - 30);
         if (this->m_truncated) {
             /* Get width with spacing. */
             this->m_scroll_text = std::string(m_current_track).append("       ").append(m_current_track);

@@ -10,6 +10,7 @@ class BrowserGui : public tsl::Gui {
     IFileSystem m_fs;
     bool open, has_music;
     char cwd[FS_MAX_PATH];
+    bool m_flag;
 
   public:
     BrowserGui();

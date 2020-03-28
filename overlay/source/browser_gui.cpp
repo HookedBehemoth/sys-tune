@@ -8,7 +8,7 @@ constexpr const char *const base_path = "/music/";
 char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
-    : m_fs(), open(), has_music(), cwd("/") {
+    : m_fs(), open(), has_music(), cwd("/"), m_flag(true) {
     FsFileSystem fs;
     Result rc = fsOpenSdCardFileSystem(&fs);
     if (R_SUCCEEDED(rc)) {
@@ -26,9 +26,7 @@ BrowserGui::BrowserGui()
 tsl::elm::Element *BrowserGui::createUI() {
     auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
 
-    if (open) {
-        this->scanCwd();
-    } else {
+    if (!open) {
         this->m_list->addItem(new tsl::elm::ListItem("Couldn't open SdCard filesystem"));
     }
 
@@ -37,7 +35,12 @@ tsl::elm::Element *BrowserGui::createUI() {
     return rootFrame;
 }
 
-void BrowserGui::update() {}
+void BrowserGui::update() {
+    if (this->m_flag) {
+        this->scanCwd();
+        this->m_flag = false;
+    }
+}
 bool BrowserGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
     if (keysDown & KEY_B) {
         if (this->has_music && this->cwd[7] == '\0') {
@@ -63,7 +66,7 @@ void BrowserGui::scanCwd() {
             if (elm.type == FsDirEntryType_Dir) {
                 this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
                     std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, text.c_str());
-                    this->scanCwd();
+                    this->m_flag = true;
                 }));
             } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
                 this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
