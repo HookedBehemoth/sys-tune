@@ -1,7 +1,7 @@
 #define TESLA_INIT_IMPL
 #include "../../ipc/music.h"
 #include "error_gui.hpp"
-#include "control_gui.hpp"
+#include "main_gui.hpp"
 
 #include <tesla.hpp>
 
@@ -30,7 +30,7 @@ class OverlayTest : public tsl::Overlay {
         } else if (R_FAILED(this->init_rc)) {
             return std::make_unique<ErrorGui>("Something went wrong:", this->init_rc);
         } else {
-            return std::make_unique<ControlGui>();
+            return std::make_unique<MainGui>();
         }
     }
 };

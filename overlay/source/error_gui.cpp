@@ -1,5 +1,4 @@
 #include "error_gui.hpp"
-#include "music_ovl_frame.hpp"
 
 static char result_buffer[10];
 
@@ -12,7 +11,7 @@ ErrorGui::ErrorGui(const char *msg, Result rc) {
 }
 
 tsl::elm::Element *ErrorGui::createUI() {
-    auto rootFrame = new MusicOverlayFrame("\uE0E1  Back     \uE0E0  OK");
+    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
 
     auto *custom = new tsl::elm::CustomDrawer([&](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
         drawer->drawString("\uE150", false, (w - 90) / 2, 300, 90, 0xffff);

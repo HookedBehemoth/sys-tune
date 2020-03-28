@@ -7,7 +7,7 @@ clean:
 	$(MAKE) -C overlay clean
 	$(MAKE) -C sys-tune clean
 	rm -rf dist
-	rm sys-tune-$(VERSION)-$(GITHASH).zip
+	rm sys-tune-*-*.zip
 
 overlay:
 	$(MAKE) -C overlay

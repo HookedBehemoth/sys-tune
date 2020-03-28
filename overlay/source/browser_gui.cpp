@@ -1,7 +1,6 @@
 #include "browser_gui.hpp"
 
 #include "../../ipc/music.h"
-#include "music_ovl_frame.hpp"
 #include "select_list_item.hpp"
 
 constexpr const char *const base_path = "/music/";
@@ -25,7 +24,7 @@ BrowserGui::BrowserGui()
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
-    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B",VERSION);
+    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
 
     if (open) {
         this->scanCwd();
@@ -64,7 +63,7 @@ void BrowserGui::scanCwd() {
             if (elm.type == FsDirEntryType_Dir) {
                 this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
                     std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, text.c_str());
-                    scanCwd();
+                    this->scanCwd();
                 }));
             } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
                 this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
