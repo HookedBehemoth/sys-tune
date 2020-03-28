@@ -58,7 +58,7 @@ void __appInit() {
         R_ABORT_UNLESS(fsInitialize());
     });
 
-    fsdevMountSdmc();
+    R_ABORT_UNLESS(fsdevMountSdmc());
 }
 
 void __appExit(void) {
@@ -85,24 +85,24 @@ int main(int argc, char *argv[]) {
     music::Initialize();
 
     os::Thread audioThread;
-    audioThread.Initialize(music::ThreadFunc, nullptr, 0x10000, 0x20);
-    audioThread.Start();
+    R_ABORT_UNLESS(audioThread.Initialize(music::ThreadFunc, nullptr, 0x10000, 0x20));
+    R_ABORT_UNLESS(audioThread.Start());
 
     os::Thread eventThread;
-    eventThread.Initialize(music::EventThreadFunc, nullptr, 0x2000, 0x20);
-    eventThread.Start();
+    R_ABORT_UNLESS(eventThread.Initialize(music::EventThreadFunc, nullptr, 0x2000, 0x20));
+    R_ABORT_UNLESS(eventThread.Start());
 
     /* Create services */
-    R_ASSERT(g_server_manager.RegisterServer<music::ControlService>(MusicServiceName, MusicMaxSessions));
+    R_ABORT_UNLESS(g_server_manager.RegisterServer<music::ControlService>(MusicServiceName, MusicMaxSessions));
 
     g_server_manager.LoopProcess();
 
     music::Exit();
 
-    eventThread.Wait();
-    eventThread.Join();
+    R_ABORT_UNLESS(eventThread.Wait());
+    R_ABORT_UNLESS(eventThread.Join());
 
-    audioThread.Wait();
-    audioThread.Join();
+    R_ABORT_UNLESS(audioThread.Wait());
+    R_ABORT_UNLESS(audioThread.Join());
     return 0;
 }
