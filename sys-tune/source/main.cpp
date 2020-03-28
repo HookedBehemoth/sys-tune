@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     music::Initialize();
 
     os::Thread audioThread;
-    R_ABORT_UNLESS(audioThread.Initialize(music::ThreadFunc, nullptr, 0x10000, 0x20));
+    R_ABORT_UNLESS(audioThread.Initialize(music::ThreadFunc, nullptr, 0x8000, 0x20));
     R_ABORT_UNLESS(audioThread.Start());
 
     os::Thread eventThread;
