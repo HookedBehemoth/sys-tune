@@ -1868,6 +1868,7 @@ namespace tsl {
             virtual bool onClick(u64 keys) {
                 if (keys & KEY_A) {
                     this->triggerClickAnimation();
+                    Element::onClick(keys);
                     return true;
                 }
 

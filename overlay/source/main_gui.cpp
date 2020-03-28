@@ -1,7 +1,7 @@
 #include "main_gui.hpp"
 
 #include "browser_gui.hpp"
-//#include "queue_gui.hpp"
+#include "queue_gui.hpp"
 
 namespace {
 
@@ -37,7 +37,7 @@ tsl::elm::Element *MainGui::createUI() {
     auto *queue_button = new tsl::elm::ListItem("Current Queue");
     queue_button->setClickListener([](u64 keys) {
         if (keys & KEY_A) {
-            //tsl::changeTo<QueueGui>();
+            tsl::changeTo<QueueGui>();
             return true;
         }
         return false;

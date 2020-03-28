@@ -35,8 +35,10 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
         this->m_truncated = static_cast<s32>(width) > (this->getWidth() - 30);
         if (this->m_truncated) {
             /* Get width with spacing. */
-            this->m_scroll_text = std::string(m_current_track).append("       ").append(m_current_track);
-            this->m_text_width = width + 100;
+            this->m_scroll_text = std::string(m_current_track).append("       ");
+            auto [ex_width, ex_height] = renderer->drawString(this->m_scroll_text.c_str(), false, 0, 0, 26, tsl::style::color::ColorTransparent);
+            this->m_scroll_text.append(m_current_track);
+            this->m_text_width = ex_width;
         } else {
             this->m_text_width = width;
         }
@@ -55,8 +57,9 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
             this->m_counter++;
         }
     } else {
-        renderer->drawString(this->m_current_track.data(), false, this->getX() + 20, this->getY() + 40, 26, tsl::style::color::ColorText);
+        renderer->drawString(this->m_current_track.data(), false, this->getX() + 15, this->getY() + 40, 26, tsl::style::color::ColorText);
     }
+    renderer->drawRect(this->getX() + 15 - this->m_scroll_offset, this->getY() + 40, this->m_text_width, 5, tsl::style::color::ColorHighlight);
     /* Seek bar. */
     u32 bar_length = this->getWidth() - 30;
     renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 2, bar_length, 3, 0xffff);
