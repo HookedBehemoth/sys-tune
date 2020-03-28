@@ -90,11 +90,18 @@ namespace tsl {
 
     namespace style {
         constexpr u32 ListItemDefaultHeight = 72;       ///< Height of a standard ListItem
-        constexpr u8 ListItemHighlightSaturation = 0x9; ///< Maximum saturation of Listitem highlights
+        constexpr u8 ListItemHighlightSaturation = 0x6; ///< Maximum saturation of Listitem highlights
         constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
-            constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
+            constexpr u16 ColorFrameBackground  = 0xD000;   ///< Overlay frame background color
+            constexpr u16 ColorTransparent      = 0x0000;   ///< Transparent color
+            constexpr u16 ColorHighlight        = 0xFDF0;   ///< Greenish highlight color
+            constexpr u16 ColorFrame            = 0xF777;   ///< Outer boarder color
+            constexpr u16 ColorHandle           = 0xF555;   ///< Track bar handle color
+            constexpr u16 ColorText             = 0xFFFF;   ///< Standard text color
+            constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
+            constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
         }
     }
 
@@ -468,6 +475,10 @@ namespace tsl {
             inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
         };
 
+        struct ScissoringConfig {
+            u16 x, y, w, h;
+        };
+
         /**
          * @brief Manages the Tesla layer and draws raw data to the screen
          */
@@ -496,19 +507,26 @@ namespace tsl {
              * @param h Height
              */
             inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
-                this->m_scissoring = true;
+                if (this->m_scissoring)
+                    this->m_scissoringStack.push_back(this->m_currScissorConfig);
+                else
+                    this->m_scissoring = true;
 
-                this->m_scissorBounds[0] = x;
-                this->m_scissorBounds[1] = y;
-                this->m_scissorBounds[2] = w;
-                this->m_scissorBounds[3] = h;
+                this->m_currScissorConfig = { x, y, w, h };
             }
 
             /**
              * @brief Disables scissoring
              */
             inline void disableScissoring() {
-                this->m_scissoring = false;
+                if (this->m_scissoringStack.size() > 0) {
+                    this->m_currScissorConfig = this->m_scissoringStack.back();
+                    this->m_scissoringStack.pop_back();
+                } 
+                else {
+                    this->m_scissoring = false;
+                    this->m_currScissorConfig = { 0 };
+                }
             }
 
 
@@ -601,6 +619,62 @@ namespace tsl {
                 for (s16 x1 = x; x1 < (x + w); x1++)
                     for (s16 y1 = y; y1 < (y + h); y1++)
                         this->setPixelBlendDst(x1, y1, color);
+            }
+
+            void drawCircle(u16 centerX, u16 centerY, u16 radius, bool filled, Color color) {
+                s16 x = radius;
+                s16 y = 0;
+                s16 radiusError = 0;
+                s16 xChange = 1 - (radius << 1);
+                s16 yChange = 0;
+                
+                while (x >= y) {
+                    if(filled) {
+                        for (s16 i = centerX - x; i <= centerX + x; i++) {
+                            s16 y0 = centerY + y;
+                            s16 y1 = centerY - y;
+                            s16 x0 = i;
+                            
+                            this->setPixel(x0, y0, color);
+                            this->setPixel(x0, y1, color);
+                        }
+                        
+                        for (s16 i = centerX - y; i <= centerX + y; i++) {
+                            s16 y0 = centerY + x;
+                            s16 y1 = centerY - x;
+                            s16 x0 = i;
+
+                            this->setPixel(x0, y0, color);
+                            this->setPixel(x0, y1, color);
+                        }
+
+                        y++;
+                        radiusError += yChange;
+                        yChange += 2;
+                        if (((radiusError << 1) + xChange) > 0) {
+                            x--;
+                            radiusError += xChange;
+                            xChange += 2;
+                        }
+                    } else {
+                        this->setPixel(centerX + x, centerY + y, color);
+                        this->setPixel(centerX + y, centerY + x, color);
+                        this->setPixel(centerX - y, centerY + x, color);
+                        this->setPixel(centerX - x, centerY + y, color);
+                        this->setPixel(centerX - x, centerY - y, color);
+                        this->setPixel(centerX - y, centerY - x, color);
+                        this->setPixel(centerX + y, centerY - x, color);
+                        this->setPixel(centerX + x, centerY - y, color);
+                        
+                        if(radiusError <= 0) {
+                            y++;
+                            radiusError += 2 * y + 1;
+                        } else {
+                            x--;
+                            radiusError -= 2 * x + 1;
+                        }
+                    }
+                }
             }
 
             /**
@@ -748,7 +822,8 @@ namespace tsl {
             void *m_currentFramebuffer = nullptr;
             
             bool m_scissoring = false;
-            u16 m_scissorBounds[4];
+            ScissoringConfig m_currScissorConfig;
+            std::vector<ScissoringConfig> m_scissoringStack;
 
             stbtt_fontinfo m_stdFont, m_extFont;
 
@@ -825,10 +900,10 @@ namespace tsl {
              */
             const u32 getPixelOffset(u32 x, u32 y) {
                 if (this->m_scissoring) {
-                    if (x < this->m_scissorBounds[0] ||
-                        y < this->m_scissorBounds[1] ||
-                        x > this->m_scissorBounds[0] + this->m_scissorBounds[2] ||
-                        y > this->m_scissorBounds[1] + this->m_scissorBounds[3])
+                    if (x < this->m_currScissorConfig.x ||
+                        y < this->m_currScissorConfig.y ||
+                        x > this->m_currScissorConfig.x + this->m_currScissorConfig.w ||
+                        y > this->m_currScissorConfig.y + this->m_currScissorConfig.h)
                             return cfg::FramebufferWidth * cfg::FramebufferHeight * 2 + 1;
                 }
 
@@ -1010,6 +1085,20 @@ namespace tsl {
             }
 
             /**
+             * @brief Called once per frame with the latest HID inputs
+             * 
+             * @param keysDown Buttons pressed in the last frame
+             * @param keysHeld Buttons held down longer than one frame
+             * @param touchInput Last touch position
+             * @param leftJoyStick Left joystick position
+             * @param rightJoyStick Right joystick position
+             * @return Weather or not the input has been consumed
+             */
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) {
+                return false;
+            }
+
+            /**
              * @brief Function called when the element got touched
              * @todo Not yet implemented
              * 
@@ -1047,11 +1136,18 @@ namespace tsl {
              * 
              * @param renderer 
              */
-            virtual void frame(gfx::Renderer *renderer) {
+            virtual void frame(gfx::Renderer *renderer) final {
+                if (this->m_focused)
+                    this->drawFocusBackground(renderer);
+
+                this->draw(renderer);
+
+                renderer->enableScissoring(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight);
+
                 if (this->m_focused)
                     this->drawHighlight(renderer);
 
-                this->draw(renderer);
+                renderer->disableScissoring();
             }
 
             /**
@@ -1076,6 +1172,41 @@ namespace tsl {
                 this->m_highlightShaking = true;
                 this->m_highlightShakingDirection = direction;
                 this->m_highlightShakingStartTime = std::chrono::system_clock::now();
+            }
+
+            /**
+             * @brief Triggers the blue click animation to signal a element has been clicked on
+             * 
+             */
+            virtual void triggerClickAnimation() final {
+                this->m_clickAnimationProgress = tsl::style::ListItemHighlightLength;
+            }
+
+            /**
+             * @brief Draws the blue highlight animation when clicking on a button
+             * @note Override this if you have a element that e.g requires a non-rectangular animation or a different color
+             * 
+             * @param renderer Renderer
+             */
+            virtual void drawClickAnimation(gfx::Renderer *renderer) {
+                u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
+
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+            }
+            
+            /**
+             * @brief Draws the back background when a element is highlighted
+             * @note Override this if you have a element that e.g requires a non-rectangular focus
+             * 
+             * @param renderer Renderer
+             */
+            virtual void drawFocusBackground(gfx::Renderer *renderer) {
+                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
+
+                if (this->m_clickAnimationProgress > 0) {
+                    this->drawClickAnimation(renderer);
+                    this->m_clickAnimationProgress--;
+                }
             }
 
             /**
@@ -1125,8 +1256,6 @@ namespace tsl {
                     }
                 }
 
-                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
-
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y, 4, this->m_height, a(highlightColor));
@@ -1141,7 +1270,7 @@ namespace tsl {
              * @param width Width
              * @param height Height
              */
-            virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
+            virtual void setBoundaries(s32 x, s32 y, s32 width, s32 height) final {
                 this->m_x = x;
                 this->m_y = y;
                 this->m_width = width;
@@ -1162,25 +1291,25 @@ namespace tsl {
              * 
              * @return X position
              */
-            virtual inline u16 getX() final { return this->m_x; }
+            virtual inline s32 getX() final { return this->m_x; }
             /**
              * @brief Gets the element's Y position
              * 
              * @return Y position
              */
-            virtual inline u16 getY() final { return this->m_y; }
+            virtual inline s32 getY() final { return this->m_y; }
             /**
              * @brief Gets the element's Width
              * 
              * @return Width
              */
-            virtual inline u16 getWidth()  final { return this->m_width;  }
+            virtual inline s32 getWidth()  final { return this->m_width;  }
             /**
              * @brief Gets the element's Height
              * 
              * @return Height
              */
-            virtual inline u16 getHeight() final { return this->m_height; }
+            virtual inline s32 getHeight() final { return this->m_height; }
 
             /**
              * @brief Sets the element's parent
@@ -1207,14 +1336,7 @@ namespace tsl {
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
             bool m_focused = false;
-
-        private:
-            friend class Gui;
-
-            u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
-            Element *m_parent = nullptr;
-
-            std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
+            u8 m_clickAnimationProgress = 0;
 
             // Highlight shake animation
             bool m_highlightShaking = false;
@@ -1236,6 +1358,43 @@ namespace tsl {
 
                 return roundf(a * exp(-(tau * t_) * sin(w * t_)));
             }
+
+        private:
+            friend class Gui;
+
+            s32 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
+            Element *m_parent = nullptr;
+
+            std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
+
+        };
+
+        /**
+         * @brief A Element that exposes the renderer directly to draw custom views easily
+         */
+        class CustomDrawer : public Element {
+        public:
+            /**
+             * @brief Constructor
+             * @note This element should only be used to draw static things the user cannot interact with e.g info text, images, etc.
+             * 
+             * @param renderFunc Callback that will be called once every frame to draw this view
+             */
+            CustomDrawer(std::function<void(gfx::Renderer* r, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
+            virtual ~CustomDrawer() {}
+
+            virtual void draw(gfx::Renderer* renderer) override {
+                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                renderer->disableScissoring();
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+
+            }
+
+        private:
+            std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
         };
 
 
@@ -1258,13 +1417,14 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+                renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
 
-                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
-                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
+                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
+                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1274,7 +1434,7 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 125, parentWidth - 85, parentHeight - 73 - 125);
                     this->m_contentElement->invalidate();
                 }
             }
@@ -1303,10 +1463,119 @@ namespace tsl {
                 }
             }
 
+            /**
+             * @brief Changes the title of the menu
+             * 
+             * @param title Title to change to
+             */
+            virtual void setTitle(const std::string &title) final {
+                this->m_title = title;
+            }
+
+            /**
+             * @brief Changes the subtitle of the menu
+             * 
+             * @param title Subtitle to change to
+             */
+            virtual void setSubtitle(const std::string &subtitle) final {
+                this->m_subtitle = subtitle;
+            }
+
         protected:
             Element *m_contentElement = nullptr;
 
             std::string m_title, m_subtitle;
+        };
+
+        /**
+         * @brief The base frame which can contain another view with a customizable header
+         * 
+         */
+        class HeaderOverlayFrame : public Element {
+        public:
+            HeaderOverlayFrame(u16 headerHeight = 175) : Element(), m_headerHeight(headerHeight) {}
+            virtual ~HeaderOverlayFrame() {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+
+                if (this->m_header != nullptr)
+                    delete this->m_header;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
+
+                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
+
+                if (this->m_header != nullptr)
+                    this->m_header->frame(renderer);
+
+                if (this->m_contentElement != nullptr)
+                    this->m_contentElement->frame(renderer);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
+
+                if (this->m_contentElement != nullptr) {
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + this->m_headerHeight, parentWidth - 85, parentHeight - 73 - this->m_headerHeight);
+                    this->m_contentElement->invalidate();
+                }
+
+                if (this->m_header != nullptr) {
+                    this->m_header->setBoundaries(parentX, parentY, parentWidth, this->m_headerHeight);
+                    this->m_header->invalidate();
+                }
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->requestFocus(oldFocus, direction);
+                else
+                    return nullptr;
+            }
+
+            /**
+             * @brief Sets the content of the frame
+             * 
+             * @param content Element
+             */
+            virtual void setContent(Element *content) final {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+
+                this->m_contentElement = content;
+
+                if (content != nullptr) {
+                    this->m_contentElement->setParent(this);
+                    this->invalidate();
+                }
+            }
+
+            /**
+             * @brief Sets the header of the frame
+             * 
+             * @param header Header custom drawer
+             */
+            virtual void setHeader(CustomDrawer *header) final {
+                if (this->m_header != nullptr)
+                    delete this->m_header;
+
+                this->m_header = header;
+
+                if (header != nullptr) {
+                    this->m_header->setParent(this);
+                    this->invalidate();
+                }
+            }
+
+        protected:
+            Element *m_contentElement = nullptr;
+            CustomDrawer *m_header = nullptr;
+
+            u16 m_headerHeight;
         };
 
         /**
@@ -1331,6 +1600,181 @@ namespace tsl {
 
         private:
             gfx::Color m_color;
+        };
+
+
+        /**
+         * @brief A List containing list items
+         * 
+         */
+        class List : public Element {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
+             */
+            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
+            virtual ~List() {
+                for (auto& item : this->m_items)
+                    delete item;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+
+                for (auto &entry : this->m_items) {
+                    if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
+                        entry->frame(renderer);
+                    }
+                }
+
+                renderer->disableScissoring();
+
+                this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
+                this->invalidate();
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                s32 y = this->getY() - this->m_offset;
+
+                this->m_listHeight = 0;
+                for (auto &entry : this->m_items)
+                    this->m_listHeight += entry->getHeight();
+
+                for (auto &entry : this->m_items) {
+                    entry->setBoundaries(this->getX(), y, this->getWidth(), entry->getHeight());
+                    entry->invalidate();
+                    y += entry->getHeight();
+                }
+            }
+
+            /**
+             * @brief Adds a new item to the list
+             * 
+             * @param element Element to add
+             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
+             */
+            virtual void addItem(Element *element, u16 height = 0) final {
+                if (element != nullptr) {
+                    if (height != 0)
+                        element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
+
+                    element->setParent(this);
+                    element->invalidate();
+                    this->m_items.push_back(element);
+                    this->invalidate();
+                }
+
+                if (this->m_items.size() == 1)
+                    this->requestFocus(nullptr, FocusDirection::None);
+            }   
+
+            /**
+             * @brief Removes all children from the list
+             * @warning When clearing a list, make sure none of the its children are focused. Call \ref Gui::removeFocus before.
+             */
+            virtual void clear() final {     
+                for (auto& item : this->m_items)
+                    delete item;
+
+                this->m_items.clear();
+                this->m_offset = 0;
+                this->m_focusedIndex = 0;
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                Element *newFocus = nullptr;
+
+                if (direction == FocusDirection::None) {
+                    for (u16 i = 0; i < this->m_items.size(); i++) {
+                        newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+
+                        if (newFocus != nullptr) {
+                            m_focusedIndex = i;
+
+                            this->updateScrollOffset();
+                            return newFocus;
+                        }
+                    }
+                } else {
+                    if (direction == FocusDirection::Down) {
+
+                        for (u16 i = this->m_focusedIndex + 1; i < this->m_items.size(); i++) {
+                            newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+
+                            if (newFocus != nullptr && newFocus != oldFocus) {
+                                this->m_focusedIndex = i;
+
+                                this->updateScrollOffset();
+                                return newFocus;
+                            }
+                        }
+
+                        return oldFocus;
+                    } else if (direction == FocusDirection::Up) {
+                        if (this->m_focusedIndex > 0) {
+
+                            for (u16 i = this->m_focusedIndex - 1; i >= 0; i--) {
+                                if (i > this->m_items.size() || this->m_items[i] == nullptr)
+                                    return oldFocus;
+                                else
+                                    newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+                                
+                                if (newFocus != nullptr && newFocus != oldFocus) {
+                                    this->m_focusedIndex = i;
+                                    
+                                    this->updateScrollOffset();
+                                    return newFocus;
+                                }
+                            }
+                        }
+
+                        return oldFocus;
+                    }
+                }
+
+                return oldFocus;
+            }
+
+            /**
+             * @brief Gets the index in the list of the element passed in
+             * 
+             * @param element Element to check
+             * @return Index in list. -1 for if the element isn't a member of the list
+             */
+            virtual s32 getIndexInList(Element *element) {
+                auto it = std::find(this->m_items.begin(), this->m_items.end(), element);
+
+                if (it == this->m_items.end())
+                    return -1;
+
+                return it - this->m_items.begin();
+            }
+
+        protected:
+            std::vector<Element*> m_items;
+            u16 m_focusedIndex = 0;
+
+            float m_offset = 0, m_nextOffset = 0;
+            u32 m_listHeight = 0;
+            u16 m_entriesShown = 5;
+
+        private:
+
+            virtual void updateScrollOffset() {
+                this->m_nextOffset = 0;
+                for (u16 i = 0; i < this->m_focusedIndex; i++)
+                    this->m_nextOffset += this->m_items[i]->getHeight();
+
+                this->m_nextOffset -= this->getHeight() / 4;
+                
+                if (this->m_nextOffset < 0)
+                    this->m_nextOffset = 0;
+
+                if (this->m_nextOffset > (this->m_listHeight - this->getHeight()) + 50)
+                    this->m_nextOffset = (this->m_listHeight - this->getHeight() + 50);
+            }
         };
 
         /**
@@ -1361,6 +1805,7 @@ namespace tsl {
                     size_t written = 0;
                     renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
                     this->m_trunctuated = written < this->m_text.length();
+
                     if (this->m_trunctuated) {
                         this->m_maxScroll = this->m_text.length() + 8;
                         this->m_scrollText = this->m_text + "        " + this->m_text;
@@ -1368,52 +1813,48 @@ namespace tsl {
                     }
                 }
 
-                if (this->m_selectFactor) {
-                    u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_selectFactor) / float(tsl::style::ListItemHighlightLength));
-                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
-                    --this->m_selectFactor;
-                }
-
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
-                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
                 const char *text = m_text.c_str();
                 if (this->m_trunctuated) {
                     if (this->m_focused) {
                         if (this->m_scroll) {
-                            if ((this->m_counter % 20) == 0) {
+                            if ((this->m_scrollAnimationCounter % 20) == 0) {
                                 this->m_scrollOffset++;
                                 if (this->m_scrollOffset >= this->m_maxScroll) {
                                     this->m_scrollOffset = 0;
                                     this->m_scroll = false;
-                                    this->m_counter = 0;
+                                    this->m_scrollAnimationCounter = 0;
                                 }
                             }
                             text = this->m_scrollText.c_str() + this->m_scrollOffset;
                         } else {
-                            if (this->m_counter > 60) {
+                            if (this->m_scrollAnimationCounter > 60) {
                                 this->m_scroll = true;
-                                this->m_counter = 0;
+                                this->m_scrollAnimationCounter = 0;
                             }
                         }
-                        this->m_counter++;
+                        this->m_scrollAnimationCounter++;
                     } else {
                         text = this->m_ellipsisText.c_str();
                     }
                 }
 
-                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
-                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                
+                this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
             }
 
             virtual bool onClick(u64 keys) {
-                if (keys & KEY_A)
-                    m_selectFactor = tsl::style::ListItemHighlightLength;
+                if (keys & KEY_A) {
+                    this->triggerClickAnimation();
+                    return true;
+                }
 
                 return false;
             }
@@ -1421,7 +1862,7 @@ namespace tsl {
             virtual void setFocused(bool state) override {
                 this->m_scroll = false;
                 this->m_scrollOffset = 0;
-                this->m_counter = 0;
+                this->m_scrollAnimationCounter = 0;
                 this->m_focused = state;
             }
 
@@ -1434,8 +1875,10 @@ namespace tsl {
              * 
              * @param text Text
              */
-            virtual inline void setText(const std::string& text) final {
+            virtual inline void setText(const std::string& text) {
                 this->m_text = text;
+                this->m_scrollText = "";
+                this->m_ellipsisText = "";
                 this->m_maxWidth = 0;
             }
 
@@ -1456,6 +1899,7 @@ namespace tsl {
             std::string m_value = "";
             std::string m_scrollText = "";
             std::string m_ellipsisText = "";
+
             bool m_scroll = false;
             bool m_trunctuated = false;
             bool m_faint = false;
@@ -1463,8 +1907,7 @@ namespace tsl {
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
-            u16 m_counter = 0;
-            u8 m_selectFactor = 0;
+            u16 m_scrollAnimationCounter = 0;
         };
 
         /**
@@ -1489,14 +1932,14 @@ namespace tsl {
 
             virtual ~ToggleListItem() {}
 
-            virtual bool onClick(u64 keys) {
+            virtual bool onClick(u64 keys) override {
                 if (keys & KEY_A) {
                     this->m_state = !this->m_state;
 
                     this->setState(this->m_state);
                     this->m_stateChangedListener(this->m_state);
 
-                    return true;
+                    return ListItem::onClick(keys);
                 }
 
                 return false;
@@ -1541,169 +1984,261 @@ namespace tsl {
             std::function<void(bool)> m_stateChangedListener = [](bool){};
         };
 
+        class CategoryHeader : public ListItem {
+        public:
+            CategoryHeader(const std::string &title) : ListItem(title) {}
+            virtual ~CategoryHeader() {}
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->drawRect(this->getX() - 2, this->getY() + this->getHeight() - 30, 5, 23, tsl::style::color::ColorHeaderBar);
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getY() + this->getHeight() - 12, 15, tsl::style::color::ColorText);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                // Check if the CategoryHeader is part of a list and if it's the first entry in it, half it's height
+                if (List *list = dynamic_cast<List*>(this->getParent()); list != nullptr) {
+                    if (list->getIndexInList(this) == 0) {
+                        this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight / 2);
+                        return;
+                    }
+                }
+
+                this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
+            }
+
+            virtual bool onClick(u64 keys) {
+                return false;
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                return nullptr;
+            }
+        };
 
         /**
-         * @brief A List containing list items
+         * @brief A customizable analog trackbar going from 0% to 100%
          * 
          */
-        class List : public Element {
+        class TrackBar : public ListItem {
         public:
             /**
              * @brief Constructor
              * 
-             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
              */
-            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
-            virtual ~List() {
-                for (auto& item : this->m_items)
-                    delete item.element;
+            TrackBar(const char icon[3]) : ListItem(icon), m_icon(icon) { }
+
+            virtual ~TrackBar() {}
+
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
+                if (keysHeld & KEY_LEFT) {
+                    if (this->m_value > 0) {
+                        this->m_value--;
+                        this->m_valueChangedListener(this->m_value);
+                        return true;
+                    }
+                }
+
+                if (keysHeld & KEY_RIGHT) {
+                    if (this->m_value < 100) {
+                        this->m_value++;
+                        this->m_valueChangedListener(this->m_value);
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                u16 i = 0;
-                for (auto &entry : this->m_items) {
-                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
-                        entry.element->frame(renderer);
-                    }
-                    i++;
-                }
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+
+                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
+
+                u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
+                renderer->drawCircle(this->getX() + 60, this->getY() + 37, 2, true, tsl::style::color::ColorHighlight);
+                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 37, 2, true, tsl::style::color::ColorFrame);
+                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 35, this->getWidth() - 95 - handlePos, 5, tsl::style::color::ColorFrame);
+                renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, tsl::style::color::ColorHighlight);
+
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, tsl::style::color::ColorHandle);
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, false, tsl::style::color::ColorFrame);
             }
 
-            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                u16 y = this->getY();
-                u16 i = 0;
-                for (auto &entry : this->m_items) {
-                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
-                        entry.element->setBoundaries(this->getX(), y, this->getWidth(), entry.height);
-                        entry.element->invalidate();
-                        y += entry.height;
+            virtual void drawFocusBackground(gfx::Renderer *renderer) {
+                // No background drawn here in HOS
+            }
+
+            virtual void drawHighlight(gfx::Renderer *renderer) override {
+                static float counter = 0;
+                const float progress = (std::sin(counter) + 1) / 2;
+                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                                                static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
+                                                static_cast<u8>((0xC - 0xF) * progress + 0xF), 
+                                                0xF };
+
+                counter += 0.1F;
+
+                u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
+
+                s32 x = 0;
+                s32 y = 0;
+
+                if (Element::m_highlightShaking) {
+                    auto t = (std::chrono::system_clock::now() - Element::m_highlightShakingStartTime);
+                    if (t >= 100ms)
+                        Element::m_highlightShaking = false;
+                    else {
+                        s32 amplitude = std::rand() % 5 + 5;
+
+                        switch (Element::m_highlightShakingDirection) {
+                            case FocusDirection::Up:
+                                y -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Down:
+                                y += shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Left:
+                                x -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Right:
+                                x += shakeAnimation(t, amplitude);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        x = std::clamp(x, -amplitude, amplitude);
+                        y = std::clamp(y, -amplitude, amplitude);
                     }
-                    i++;
+                }
+
+                for (u8 i = 16; i <= 19; i++) {
+                    renderer->drawCircle(this->getX() + 62 + x + handlePos, this->getY() + 37 + y, i, false, a(highlightColor));
                 }
             }
 
             /**
-             * @brief Adds a new item to the list
+             * @brief Gets the current value of the trackbar
              * 
-             * @param element Element to add
-             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
+             * @return State
              */
-            virtual void addItem(Element *element, u16 height = 0) final {
-                if (height == 0) {
-                    if (dynamic_cast<ListItem*>(element) != nullptr)
-                        height = tsl::style::ListItemDefaultHeight;
-                }
-
-                if (element != nullptr && height > 0) {
-                    element->setParent(this);
-                    this->m_items.push_back({ element, height });
-                    this->invalidate();
-                }
-
-                if (this->m_items.size() == 1)
-                    this->requestFocus(nullptr, FocusDirection::None);
-            }   
-
-            /**
-             * @brief Removes all children from the list
-             */
-            virtual void clear() final {              
-                for (auto& item : this->m_items)
-                    delete item.element;
-
-                this->m_items.clear();
-                this->m_offset = 0;
-                this->m_focusedElement = 0;
+            virtual inline u8 getProgress() {
+                return this->m_value;
             }
 
-            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
-                if (this->m_items.size() == 0)
-                    return nullptr;
+            /**
+             * @brief Sets the current state of the toggle. Updates the Value
+             * 
+             * @param state State
+             */
+            virtual void setProgress(u8 value) {
+                this->m_value = value;
+            }
 
-                auto it = std::find(this->m_items.begin(), this->m_items.end(), oldFocus);
+            /**
+             * @brief Adds a listener that gets called whenever the state of the toggle changes
+             * 
+             * @param stateChangedListener Listener with the current state passed in as parameter
+             */
+            void setValueChangedListener(std::function<void(u8)> valueChangedListener) {
+                this->m_valueChangedListener = valueChangedListener;
+            } 
 
-                if (it == this->m_items.end() || direction == FocusDirection::None)
-                    return this->m_items[0].element;
+        protected:
+            const char *m_icon = nullptr;
+            u8 m_value = 0;
 
-                u16 oldFocusIdx = std::distance(this->m_items.begin(), it);
+            std::function<void(u8)> m_valueChangedListener = [](u8){};
 
-                // number of spaces to have between top/bottom item and focused item while scrolling
-                // default 1, cannot exceed half of the number of entries shown
-                const int lead = std::min(1, (this->m_entriesShown - 1) / 2);
+        private:
+            virtual inline void setText(const std::string& text) {}
+            virtual inline void setValue(const std::string& value, bool faint = false) {}
+        };
 
-                if (direction == FocusDirection::Up) {
-                    if (oldFocusIdx == 0)
-                        return this->m_items[0].element;
-                    else {
-                        // old focus on the leading item, and has items offscreen above
-                        if (oldFocusIdx == this->m_offset + lead) {
-                            if (this->m_offset > 0) {
-                                this->m_offset--;
-                                this->invalidate();
-                            }
-                        }
-                        return (it - 1)->element;
-                    }
-                } else if (direction == FocusDirection::Down) {
-                    if (oldFocusIdx == this->m_items.size() - 1)
-                        return this->m_items[this->m_items.size() - 1].element;
-                    else {
-                        // old focus on the leading item, and has more items offscreen below
-                        if (oldFocusIdx == this->m_offset + (this->m_entriesShown - 1) - lead) {
-                            if (this->m_offset + this->m_entriesShown < this->m_items.size()) {
-                                this->m_offset++;
-                                this->invalidate();
-                            }
-                        }
-                        return (it + 1)->element;
+        class StepTrackBar : public TrackBar {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
+             */
+            StepTrackBar(const char icon[3], std::initializer_list<std::string> stepDescriptions) 
+                : TrackBar(icon), m_numSteps(stepDescriptions.size()), m_stepDescriptions(stepDescriptions.begin(), stepDescriptions.end()) { }
+
+            virtual ~StepTrackBar() {}
+
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
+                return false;
+            }
+
+            virtual bool onClick(u64 key) {
+                if (key & KEY_LEFT) {
+                    if (this->m_value > 0) {
+                        this->m_value = std::max(this->m_value - (100 / (this->m_numSteps - 1)), 0);
+                        this->m_valueChangedListener(this->getProgress());
+                        return true;
                     }
                 }
-                
-                return it->element;
+
+                if (key & KEY_RIGHT) {
+                    if (this->m_value < 100) {
+                        this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
+                        this->m_valueChangedListener(this->getProgress());
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+
+                u16 trackBarWidth = this->getWidth() - 95;
+                u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
+
+                for (u8 i = 0; i < this->m_numSteps; i++) {
+                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 45, 1, 10, tsl::style::color::ColorFrame);
+                }
+
+                u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
+
+                auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
+                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, tsl::style::color::ColorDescription);
+
+                TrackBar::draw(renderer);
+            }
+
+            /**
+             * @brief Gets the current value of the trackbar
+             * 
+             * @return State
+             */
+            virtual inline u8 getProgress() override {
+                return this->m_value / (100 / (this->m_numSteps - 1));
+            }
+
+            /**
+             * @brief Sets the current state of the toggle. Updates the Value
+             * 
+             * @param state State
+             */
+            virtual void setProgress(u8 value) override {
+                value = std::min(value, u8(this->m_numSteps - 1));
+                this->m_value = value * (100 / (this->m_numSteps - 1));
             }
 
         protected:
-            struct ListEntry {
-                Element *element;
-                u16 height;
-
-                bool operator==(Element *other) {
-                    return this->element == other;
-                }
-            };
-
-            std::vector<ListEntry> m_items;
-            u16 m_focusedElement = 0;
-
-            u16 m_offset = 0;
-            u16 m_entriesShown = 5;
+            u8 m_numSteps = 1;
+            std::vector<std::string> m_stepDescriptions;
         };
-
-        /**
-         * @brief A Element that exposes the renderer directly to draw custom views easily
-         */
-        class CustomDrawer : public Element {
-            public:
-                /**
-                 * @brief Constructor
-                 * @note This element should only be used to draw static things the user cannot interact with e.g info text, images, etc.
-                 * 
-                 * @param renderFunc Callback that will be called once every frame to draw this view
-                 */
-                CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
-                virtual ~CustomDrawer() {}
-
-                virtual void draw(gfx::Renderer* renderer) override {
-                    this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
-                }
-
-                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                    this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
-                }
-
-            private:
-                std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
-            };
 
     }
 
@@ -2085,6 +2620,12 @@ namespace tsl {
                 parentElement = parentElement->getParent();
             } while (!handled && parentElement != nullptr);
 
+            parentElement = currentFocus;
+            do {
+                handled = parentElement->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
+                parentElement = parentElement->getParent();
+            } while (!handled && parentElement != nullptr);
+
             if (currentGui != this->getCurrentGui())
                 return;
 
@@ -2266,18 +2807,36 @@ namespace tsl {
 
                     shData->keysDown = 0;
                     shData->keysHeld = 0;
+                    shData->joyStickPosLeft  = { 0 };
+                    shData->joyStickPosRight = { 0 };
 
                     // Combine input from all controllers
                     for (u8 controller = 0; controller < 8; controller++) {
                         if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
                             shData->keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
                             shData->keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
+
+                            JoystickPosition joyStickPosLeft, joyStickPosRight;
+                            hidJoystickRead(&joyStickPosLeft, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_LEFT);
+                            hidJoystickRead(&joyStickPosRight, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_RIGHT);
+
+                            if (joyStickPosLeft.dx > 0 && joyStickPosLeft.dx > shData->joyStickPosLeft.dx)
+                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
+                            if (joyStickPosLeft.dx < 0 && joyStickPosLeft.dx < shData->joyStickPosLeft.dx)
+                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
+                            if (joyStickPosLeft.dy > 0 && joyStickPosLeft.dy > shData->joyStickPosLeft.dy)
+                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
+                            if (joyStickPosLeft.dy < 0 && joyStickPosLeft.dy < shData->joyStickPosLeft.dy)
+                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
                         }
                     }
 
                     if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
                         shData->keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
                         shData->keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
+
+                        hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
+                        hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
                     }
 
                     // Read in touch positions
@@ -2285,10 +2844,6 @@ namespace tsl {
                         hidTouchRead(&shData->touchPos, 0);
                     else 
                         shData->touchPos = { 0 };
-
-                    // Read in joystick values
-                    hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
-                    hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
 
                     if (((shData->keysHeld & tsl::cfg::launchCombo) == tsl::cfg::launchCombo) && shData->keysDown & tsl::cfg::launchCombo) {
                         if (shData->overlayOpen) {
@@ -2417,7 +2972,7 @@ namespace tsl {
         shData.running = true;
 
         Thread hidPollerThread, homeButtonDetectorThread, powerButtonDetectorThread;
-        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x10, -2);
         threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
         threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
         threadStart(&hidPollerThread);
