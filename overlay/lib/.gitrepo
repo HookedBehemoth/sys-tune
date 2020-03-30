@@ -4,9 +4,9 @@
 ; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
 ;
 [subrepo]
-	remote = git@github.com:WerWolv/libtesla.git
-	branch = master
-	commit = 2f59ad660890abc9c17bdbc63c7646a3a11fb2ef
-	parent = 6056e58d650468eee78f966e7c69977d12c738f5
+	remote = git@github.com:HookedBehemoth/libtesla.git
+	branch = tackbar_touch_value_listener
+	commit = bf773f64d3a64c8f0b96fe3dd0fb87982137ccbc
+	parent = 52b40c6660e7b20cb0147146da88bf7830552ed1
 	method = merge
 	cmdver = 0.4.1
