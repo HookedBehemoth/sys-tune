@@ -6,11 +6,10 @@
 namespace {
 
     char path_buffer[FS_MAX_PATH] = "";
+    constexpr const size_t num_steps = 20;
 
     void volumeCallback(u8 value) {
-        if (value % 5)
-            return;
-        double music_volume = double(value) / 100;
+        double music_volume = double(value) / num_steps;
         musicSetVolume(music_volume);
     }
 
@@ -18,7 +17,7 @@ namespace {
 
 MainGui::MainGui() : m_progress_text(" 0:00"), m_total_text(" 0:00") {
     m_status_bar = new StatusBar(path_buffer, this->m_progress_text, this->m_total_text);
-    m_volume_slider = new tsl::elm::TrackBar("\uE13C");
+    m_volume_slider = new tsl::elm::StepTrackBar("\uE13C", num_steps);
     /* Get initial volume. */
     double volume = 0;
     musicGetVolume(&volume);

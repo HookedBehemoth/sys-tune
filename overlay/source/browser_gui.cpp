@@ -9,14 +9,12 @@ char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
     : m_fs(), open(), has_music(), cwd("/"), m_flag(false) {
-    FsFileSystem fs;
-    Result rc = fsOpenSdCardFileSystem(&fs);
+    Result rc = fs::OpenSdCardFileSystem(&this->m_fs);
     if (R_SUCCEEDED(rc)) {
-        this->m_fs = IFileSystem(std::move(fs));
         this->open = true;
         this->m_flag = true;
         IDirectory dir;
-        if (R_SUCCEEDED(m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
+        if (R_SUCCEEDED(this->m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
             std::strcpy(this->cwd, base_path);
             this->has_music = true;
         }
@@ -59,7 +57,7 @@ void BrowserGui::scanCwd() {
     this->m_list->clear();
     /* Open directory. */
     IDirectory dir;
-    Result rc = m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
+    Result rc = this->m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
     if (R_SUCCEEDED(rc)) {
         /* Iternate over directory. */
         for (const auto &elm : DirectoryIterator(&dir)) {
@@ -79,7 +77,6 @@ void BrowserGui::scanCwd() {
     } else {
         this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
     }
-    tsl::Gui::requestFocus(this->m_list, tsl::FocusDirection::None);
 }
 
 void BrowserGui::upCwd() {

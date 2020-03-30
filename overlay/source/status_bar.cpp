@@ -43,10 +43,11 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
             this->m_text_width = width;
         }
     }
+
     /* Current track. */
     if (this->m_truncated) {
         renderer->drawString(this->m_scroll_text.c_str(), false, this->getX() + 15 - this->m_scroll_offset, this->getY() + 40, 26, tsl::style::color::ColorText);
-        if (this->m_counter > 60) {
+        if (this->m_counter == 60) {
             if (this->m_scroll_offset == this->m_text_width) {
                 this->m_scroll_offset = 0;
                 this->m_counter = 0;
@@ -59,7 +60,7 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     } else {
         renderer->drawString(this->m_current_track.data(), false, this->getX() + 15, this->getY() + 40, 26, tsl::style::color::ColorText);
     }
-    renderer->drawRect(this->getX() + 15 - this->m_scroll_offset, this->getY() + 40, this->m_text_width, 5, tsl::style::color::ColorHighlight);
+
     /* Seek bar. */
     u32 bar_length = this->getWidth() - 30;
     renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 2, bar_length, 3, 0xffff);
