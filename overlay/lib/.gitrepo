@@ -6,7 +6,7 @@
 [subrepo]
 	remote = git@github.com:HookedBehemoth/libtesla.git
 	branch = tackbar_touch_value_listener
-	commit = bf773f64d3a64c8f0b96fe3dd0fb87982137ccbc
-	parent = 52b40c6660e7b20cb0147146da88bf7830552ed1
+	commit = 3518ade76074dbd0ae550a41e61b26ad7570d354
+	parent = 3c58c69343a4c59f041bfa9a7296398d5ac3cefc
 	method = merge
 	cmdver = 0.4.1
