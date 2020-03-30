@@ -8,12 +8,13 @@ constexpr const char *const base_path = "/music/";
 char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
-    : m_fs(), open(), has_music(), cwd("/"), m_flag(true) {
+    : m_fs(), open(), has_music(), cwd("/"), m_flag(false) {
     FsFileSystem fs;
     Result rc = fsOpenSdCardFileSystem(&fs);
     if (R_SUCCEEDED(rc)) {
         this->m_fs = IFileSystem(std::move(fs));
         this->open = true;
+        this->m_flag = true;
         IDirectory dir;
         if (R_SUCCEEDED(m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
             std::strcpy(this->cwd, base_path);
