@@ -1,4 +1,4 @@
-#include "misc.hpp"
+#include "dir_iterator.hpp"
 
 DirectoryIterator::DirectoryIterator(IDirectory *dir)
     : m_dir(dir) {

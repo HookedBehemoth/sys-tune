@@ -120,3 +120,72 @@ Result IFileSystem::GetTotalSpace(s64 *out, const char *path) {
 Result IFileSystem::GetFileTimeStampRaw(FsTimeStampRaw *out, const char *path) {
     return fsFsGetFileTimeStampRaw(&this->m_fs, path, out);
 }
+
+namespace fs {
+
+    Result OpenFileSystem(IFileSystem* out, FsFileSystemType fsType, const char* contentPath) {
+        FsFileSystem fs;
+        Result rc = fsOpenFileSystem(&fs, fsType, contentPath);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenFileSystemWithPatch(IFileSystem* out, u64 id, FsFileSystemType fsType) {
+        FsFileSystem fs;
+        Result rc = fsOpenFileSystemWithPatch(&fs, id, fsType);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenFileSystemWithId(IFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath) {
+        FsFileSystem fs;
+        Result rc = fsOpenFileSystemWithId(&fs, id, fsType, contentPath);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+
+    }
+
+    Result OpenBisFileSystem(IFileSystem* out, FsBisPartitionId partitionId, const char* string) {
+        FsFileSystem fs;
+        Result rc = fsOpenBisFileSystem(&fs, partitionId, string);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenSdCardFileSystem(IFileSystem *out) {
+        FsFileSystem fs;
+        Result rc = fsOpenSdCardFileSystem(&fs);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenImageDirectoryFileSystem(IFileSystem *out, FsImageDirectoryId id) {
+        FsFileSystem fs;
+        Result rc = fsOpenImageDirectoryFileSystem(&fs, id);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenContentStorageFileSystem(IFileSystem* out, FsContentStorageId content_storage_id) {
+        FsFileSystem fs;
+        Result rc = fsOpenContentStorageFileSystem(&fs, content_storage_id);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+    Result OpenCustomStorageFileSystem(IFileSystem* out, FsCustomStorageId custom_storage_id) {
+        FsFileSystem fs;
+        Result rc = fsOpenCustomStorageFileSystem(&fs, custom_storage_id);
+        if (R_SUCCEEDED(rc))
+            *out = IFileSystem(std::move(fs));
+        return rc;
+    }
+
+}

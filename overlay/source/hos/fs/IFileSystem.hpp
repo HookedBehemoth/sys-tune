@@ -1,6 +1,5 @@
 #pragma once
 #include "../util/defines.hpp"
-
 #include "IDirectory.hpp"
 #include "IFile.hpp"
 
@@ -86,3 +85,16 @@ class IFileSystem {
         return this->OpenDirectory(out, mode, format_buffer);
     }
 };
+
+namespace fs {
+
+    Result OpenFileSystem(IFileSystem* out, FsFileSystemType fsType, const char* contentPath); ///< same as calling fsOpenFileSystemWithId with 0 as id
+    Result OpenFileSystemWithPatch(IFileSystem* out, u64 id, FsFileSystemType fsType); ///< [2.0.0+], like OpenFileSystemWithId but without content path.
+    Result OpenFileSystemWithId(IFileSystem* out, u64 id, FsFileSystemType fsType, const char* contentPath); ///< works on all firmwares, id is ignored on [1.0.0]
+    Result OpenBisFileSystem(IFileSystem* out, FsBisPartitionId partitionId, const char* string);
+    Result OpenSdCardFileSystem(IFileSystem *fs);
+    Result OpenImageDirectoryFileSystem(IFileSystem *out, FsImageDirectoryId  image_directory_id);
+    Result OpenContentStorageFileSystem(FsFileSystem* out, FsContentStorageId content_storage_id);
+    Result OpenCustomStorageFileSystem(FsFileSystem* out, FsCustomStorageId custom_storage_id); /// [7.0.0+]
+
+}
