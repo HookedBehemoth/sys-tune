@@ -52,22 +52,37 @@ class IFileSystem {
     /* Format */
     template <typename... Args>
     Result CreateFileFormat(s64 size, u32 option, const char *format, Args &&... args) {
+        std::snprintf(this->format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
+        return this->CreateFile(size, option, format_buffer);
+    }
+    template <typename... Args>
+    Result DeleteFileFormat(const char *format, Args &&... args) {
         std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
-        return CreateFile(size, option, format_buffer);
+        return this->DeleteFile(format_buffer);
     }
     template <typename... Args>
     Result CreateDirectoryFormat(const char *format, Args &&... args) {
         std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
-        return CreateDirectory(format_buffer);
+        return this->CreateDirectory(format_buffer);
+    }
+    template <typename... Args>
+    Result DeleteDirectoryFormat(const char *format, Args &&... args) {
+        std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
+        return this->DeleteDirectory(format_buffer);
+    }
+    template <typename... Args>
+    Result DeleteDirectoryRecursivelyFormat(const char *format, Args &&... args) {
+        std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
+        return this->DeleteDirectoryRecursively(format_buffer);
     }
     template <typename File, typename... Args>
     Result OpenFileFormat(File *out, u32 mode, const char *format, Args &&... args) {
         std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
-        return OpenFile(out, mode, format_buffer);
+        return this->OpenFile(out, mode, format_buffer);
     }
     template <typename Dir, typename... Args>
     Result OpenDirectoryFormat(Dir *out, u32 mode, const char *format, Args &&... args) {
         std::snprintf(format_buffer, FS_MAX_PATH, format, std::forward<Args>(args)...);
-        return OpenDirectory(out, mode, format_buffer);
+        return this->OpenDirectory(out, mode, format_buffer);
     }
 };
