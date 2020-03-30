@@ -13,13 +13,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #pragma once
-#include "fssystem/fssystem_utility.hpp"
-#include "fssystem/fssystem_external_code.hpp"
-#include "fssystem/fssystem_partition_file_system.hpp"
-#include "fssystem/fssystem_partition_file_system_meta.hpp"
-#include "fssystem/fssystem_path_tool.hpp"
-#include "fssystem/fssystem_subdirectory_filesystem.hpp"
-#include "fssystem/fssystem_directory_redirection_filesystem.hpp"
-#include "fssystem/fssystem_directory_savedata_filesystem.hpp"
+#include "fs_common.hpp"
+
+namespace ams::fs {
+
+    enum class ImageDirectoryId {
+        Nand   = 0,
+        SdCard = 1,
+    };
+
+    Result MountImageDirectory(const char *name, ImageDirectoryId id);
+
+}
