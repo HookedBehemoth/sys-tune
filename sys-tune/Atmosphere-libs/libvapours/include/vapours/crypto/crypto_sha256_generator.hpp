@@ -28,6 +28,8 @@ namespace ams::crypto {
     };
 
     class Sha256Generator {
+        NON_COPYABLE(Sha256Generator);
+        NON_MOVEABLE(Sha256Generator);
         private:
             using Impl = impl::Sha256Impl;
         public:
@@ -39,7 +41,7 @@ namespace ams::crypto {
                     0x30, 0x0D, /* Sequence, size 0x0D */
                         0x06, 0x09, /* Object Identifier */
                             0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, /* SHA-256 */
-                        0x00, /* Null */
+                        0x05, 0x00, /* Null */
                     0x04, 0x20, /* Octet string, size 0x20 */
             };
             static constexpr size_t Asn1IdentifierSize = util::size(Asn1Identifier);

@@ -22,11 +22,15 @@
 /* Libstratosphere-only utility. */
 #include "stratosphere/util.hpp"
 
+/* Sadly required shims. */
+#include "stratosphere/svc/svc_stratosphere_shims.hpp"
+
 /* Critical modules with no dependencies. */
 #include "stratosphere/ams.hpp"
 #include "stratosphere/os.hpp"
 #include "stratosphere/dd.hpp"
 #include "stratosphere/lmem.hpp"
+#include "stratosphere/mem.hpp"
 
 /* Pull in all ID definitions from NCM. */
 #include "stratosphere/ncm/ncm_ids.hpp"
@@ -44,6 +48,7 @@
 #include "stratosphere/lr.hpp"
 #include "stratosphere/map.hpp"
 #include "stratosphere/ncm.hpp"
+#include "stratosphere/nim.hpp"
 #include "stratosphere/patcher.hpp"
 #include "stratosphere/pm.hpp"
 #include "stratosphere/reg.hpp"

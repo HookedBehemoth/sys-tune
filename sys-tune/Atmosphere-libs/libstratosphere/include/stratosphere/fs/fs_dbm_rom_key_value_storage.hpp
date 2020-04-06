@@ -115,12 +115,11 @@ namespace ams::fs {
                 return this->GetImpl(std::addressof(pos), out, key, hash_key, aux, aux_size);
             }
 
-            Result FindOpen(FindIndex *out) const {
+            void FindOpen(FindIndex *out) const {
                 AMS_ASSERT(out != nullptr);
 
                 out->ind = static_cast<BucketIndex>(-1);
                 out->pos = InvalidPosition;
-                return ResultSuccess();
             }
 
             Result FindNext(Key *out_key, Value *out_val, FindIndex *find) {
