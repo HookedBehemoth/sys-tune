@@ -2,27 +2,36 @@
 
 #include "../types.hpp"
 
-namespace ams::music {
+namespace ams::tune::impl {
 
-    void Initialize();
+    Result Initialize();
     void Exit();
 
     void ThreadFunc(void *);
-    void EventThreadFunc(void *);
+    void PscThreadFunc(void *ptr);
+    void GpioThreadFunc(void *ptr);
 
-    Result GetStatusImpl(PlayerStatus *out);
-    Result SetStatusImpl(PlayerStatus status);
-    Result GetVolumeImpl(double *out);
-    Result SetVolumeImpl(double volume);
-    Result GetLoopImpl(LoopStatus *out);
-    Result SetLoopImpl(LoopStatus loop);
+    Result GetStatus(AudioOutState *out);
+    Result Play();
+    Result Pause();
+    void Next();
+    void Prev();
 
-    Result GetCurrentImpl(char *out_path, size_t out_path_length, CurrentTune *out);
-    Result CountTunesImpl(u32 *out);
-    Result ListTunesImpl(char *out_path, size_t out_path_length, u32 *out);
+    Result GetVolume(float *volume);
+    Result SetVolume(float volume);
 
-    Result AddToQueueImpl(const char *path, size_t path_length);
-    Result ClearImpl();
-    Result ShuffleImpl();
+    void GetRepeatMode(RepeatMode *mode);
+    void SetRepeatMode(RepeatMode mode);
+    void GetShuffleMode(ShuffleMode *mode);
+    void SetShuffleMode(ShuffleMode mode);
+
+    void GetCurrentPlaylistSize(u32 *size);
+    void GetCurrentPlaylist(u32 *size, char* buffer, size_t buffer_size);
+    Result GetCurrentQueueItem(CurrentStats *out, char* buffer, size_t buffer_size);
+    void ClearQueue();
+    void MoveQueueItem(u32 src, u32 dst);
+
+    Result Enqueue(char* buffer, size_t buffer_length, EnqueueType type);
+    void Remove(char* buffer, size_t buffer_length);
 
 }

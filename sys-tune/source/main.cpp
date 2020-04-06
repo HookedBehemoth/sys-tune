@@ -76,33 +76,55 @@ namespace {
     constexpr size_t NumServers = 1;
     sf::hipc::ServerManager<NumServers> g_server_manager;
 
-    constexpr sm::ServiceName MusicServiceName = sm::ServiceName::Encode("music");
+    constexpr sm::ServiceName MusicServiceName = sm::ServiceName::Encode("tune");
     constexpr size_t MusicMaxSessions = 0x2;
 
 }
 
 int main(int argc, char *argv[]) {
-    music::Initialize();
+    R_ABORT_UNLESS(tune::impl::Initialize());
 
-    os::Thread audioThread;
-    R_ABORT_UNLESS(audioThread.Initialize(music::ThreadFunc, nullptr, 0x8000, 0x20));
+    /* Register audio as our dependency so we can pause before it prepares for sleep. */
+    u16 dependencies[] = {PscPmModuleId_Audio};
+
+    /* Get pm module to listen for state change. */
+    PscPmModule pm_module;
+    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, 1, false));
+
+    /* Get GPIO session for the headphone jack pad. */
+    GpioPadSession headphone_detect_session;
+    R_ABORT_UNLESS(gpioOpenSession(&headphone_detect_session, GpioPadName(0x15)));
+
+    os::Thread gpioThread, pscThread, audioThread;
+    R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, nullptr, 0x1000, 0x20));
+    R_ABORT_UNLESS(pscThread.Initialize(tune::impl::PscThreadFunc, nullptr, 0x1000, 0x20));
+    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::ThreadFunc, nullptr, 0x8000, 0x20));
+
+    R_ABORT_UNLESS(gpioThread.Start());
+    R_ABORT_UNLESS(pscThread.Start());
     R_ABORT_UNLESS(audioThread.Start());
 
-    os::Thread eventThread;
-    R_ABORT_UNLESS(eventThread.Initialize(music::EventThreadFunc, nullptr, 0x2000, 0x20));
-    R_ABORT_UNLESS(eventThread.Start());
-
     /* Create services */
-    R_ABORT_UNLESS(g_server_manager.RegisterServer<music::ControlService>(MusicServiceName, MusicMaxSessions));
+    R_ABORT_UNLESS(g_server_manager.RegisterServer<tune::ControlService>(MusicServiceName, MusicMaxSessions));
 
     g_server_manager.LoopProcess();
 
-    music::Exit();
+    tune::impl::Exit();
 
-    R_ABORT_UNLESS(eventThread.Wait());
-    R_ABORT_UNLESS(eventThread.Join());
-
+    R_ABORT_UNLESS(gpioThread.Wait());
+    R_ABORT_UNLESS(pscThread.Wait());
     R_ABORT_UNLESS(audioThread.Wait());
+
+    R_ABORT_UNLESS(gpioThread.Join());
+    R_ABORT_UNLESS(pscThread.Join());
     R_ABORT_UNLESS(audioThread.Join());
+
+    /* Close gpio session. */
+    gpioPadClose(&headphone_detect_session);
+
+    /* Unregister Psc module. */
+    pscPmModuleFinalize(&pm_module);
+    pscPmModuleClose(&pm_module);
+
     return 0;
 }

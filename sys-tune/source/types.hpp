@@ -1,20 +1,28 @@
 #pragma once
 
+#include "../../ipc/tune.h"
+
 #include <stratosphere.hpp>
-#include "../../ipc/music.h"
 
 enum class PlayerStatus : u8 {
-    Stopped,
     Playing,
-    Paused,
-    Next,
-    Exit,
+    FetchNext,
 };
 
-enum class LoopStatus : u8 {
+enum class ShuffleMode : u8 {
     Off,
-    List,
-    Single,
+    On,
 };
 
-struct CurrentTune : MusicCurrentTune {};
+enum class RepeatMode : u8 {
+    Off,
+    One,
+    All,
+};
+
+enum class EnqueueType : u8 {
+    Next,
+    Last,
+};
+
+struct CurrentStats : TuneCurrentStats {};

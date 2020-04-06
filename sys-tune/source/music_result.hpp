@@ -2,7 +2,7 @@
 
 #include <stratosphere.hpp>
 
-namespace ams::music {
+namespace ams::tune {
 
     R_DEFINE_NAMESPACE_RESULT_MODULE(420);
 
