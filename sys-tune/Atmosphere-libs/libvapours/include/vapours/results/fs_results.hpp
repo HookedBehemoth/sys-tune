@@ -76,8 +76,8 @@ namespace ams::fs {
         R_DEFINE_ERROR_RESULT(AllocationFailureInRomFsFileSystemB,            3248);
         R_DEFINE_ERROR_RESULT(AllocationFailureInRomFsFileSystemC,            3249);
         R_DEFINE_ERROR_RESULT(AllocationFailureInPartitionFileSystemCreatorA, 3280);
+        R_DEFINE_ERROR_RESULT(AllocationFailureInFileSystemBuddyHeapA,        3294);
         R_DEFINE_ERROR_RESULT(AllocationFailureInDirectorySaveDataFileSystem, 3321);
-
         R_DEFINE_ERROR_RESULT(AllocationFailureInPartitionFileSystemA,        3347);
         R_DEFINE_ERROR_RESULT(AllocationFailureInPartitionFileSystemB,        3348);
         R_DEFINE_ERROR_RESULT(AllocationFailureInPartitionFileSystemC,        3349);
@@ -214,6 +214,8 @@ namespace ams::fs {
         R_DEFINE_ERROR_RESULT(GameCardLogoDataCorrupted, 4781);
 
     R_DEFINE_ERROR_RANGE(Unexpected, 5000, 5999);
+        R_DEFINE_ERROR_RESULT(UnexpectedInAesCtrStorageA,  5315);
+        R_DEFINE_ERROR_RESULT(UnexpectedInAesXtsStorageA,  5316);
         R_DEFINE_ERROR_RESULT(UnexpectedInFindFileSystemA, 5319);
 
     R_DEFINE_ERROR_RANGE(PreconditionViolation, 6000, 6499);
@@ -258,6 +260,7 @@ namespace ams::fs {
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInMemoryStorageB,                 6305);
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInFileStorageA,                   6306);
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInFileStorageB,                   6307);
+                R_DEFINE_ERROR_RESULT(UnsupportedOperationInAesCtrStorageA,                 6315);
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInFileServiceObjectAdapterA,      6362);
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInRomFsFileSystemA,               6364);
                 R_DEFINE_ERROR_RESULT(UnsupportedOperationInRomFsFileSystemB,               6365);
