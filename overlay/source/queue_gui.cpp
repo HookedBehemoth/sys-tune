@@ -1,6 +1,6 @@
 #include "queue_gui.hpp"
 
-#include "../../ipc/music.h"
+#include "../../ipc/tune.h"
 
 namespace {
 
@@ -12,7 +12,7 @@ namespace {
 
 QueueGui::QueueGui() : count() {
     m_list = new tsl::elm::List();
-    if (R_SUCCEEDED(musicListTunes(&count, queue_buffer, queue_size))) {
+    if (R_SUCCEEDED(tuneGetCurrentPlaylist(&count, queue_buffer, queue_size))) {
         char *ptr = queue_buffer;
         for (u32 i = 0; i < std::min(this->count, queue_count); i++) {
             const char *str = ptr;
@@ -25,6 +25,19 @@ QueueGui::QueueGui() : count() {
                 }
             }
             auto *item = new tsl::elm::ListItem(str);
+            item->setClickListener([i, this](u64 keys) -> bool {
+                u8 counter = 0;
+                if (keys & KEY_A) {
+                    tuneSelect(i);
+                    counter++;
+                }
+                if (keys & KEY_Y) {
+                    tuneRemove(i);
+
+                    counter++;
+                }
+                return counter;
+            });
             m_list->addItem(item);
             ptr += FS_MAX_PATH;
         }

@@ -7,19 +7,19 @@ extern "C" {
 #include <switch.h>
 
 typedef enum {
-    ShuffleMode_Off,
-    ShuffleMode_On,
+    TuneShuffleMode_Off,
+    TuneShuffleMode_On,
 } TuneShuffleMode;
 
 typedef enum {
-    RepeatMode_Off,
-    RepeatMode_One,
-    RepeatMode_All,
+    TuneRepeatMode_Off,
+    TuneRepeatMode_One,
+    TuneRepeatMode_All,
 } TuneRepeatMode;
 
 typedef enum {
-    EnqueueType_Next,
-    EnqueueType_Last,
+    TuneEnqueueType_Next,
+    TuneEnqueueType_Last,
 } TuneEnqueueType;
 
 typedef struct {
@@ -101,6 +101,7 @@ Result tuneGetCurrentQueueItem(char *out_path, size_t out_path_length, TuneCurre
  */
 Result tuneClearQueue();
 Result tuneMoveQueueItem(u32 src, u32 dst);
+Result tuneSelect(u32 index);
 
 /**
  * @brief Add track to queue.
@@ -108,9 +109,11 @@ Result tuneMoveQueueItem(u32 src, u32 dst);
  * @note Must match ^(/.*.mp3)$
  * @param[in] path Path to file on sdcard.
  */
-Result tuneEnqueue(const char *path);
+Result tuneEnqueue(const char *path, TuneEnqueueType type);
 
-Result tuneRemove(const char *path);
+Result tuneRemove(u32 index);
+
+Result tuneGetApiVersion(u32 *version);
 
 #ifdef __cplusplus
 }

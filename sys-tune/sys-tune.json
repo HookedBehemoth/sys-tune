@@ -14,7 +14,7 @@
     "filesystem_access":    {
         "permissions":    "0xFFFFFFFFFFFFFFFF"
     },
-    "service_host": ["music"],
+    "service_host": ["tune"],
     "service_access": ["*"],
     "kernel_capabilities": [
         {

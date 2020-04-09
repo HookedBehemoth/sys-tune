@@ -106,18 +106,23 @@ Result tuneMoveQueueItem(u32 src, u32 dst) {
     return serviceDispatchIn(&g_tune, 34, in);
 }
 
-Result tuneEnqueue(const char *path) {
+Result tuneSelect(u32 index) {
+    return serviceDispatchIn(&g_tune, 35, index);
+}
+
+Result tuneEnqueue(const char *path, TuneEnqueueType type) {
+    u8 tmp = type;
     size_t path_length = strlen(path);
-    return serviceDispatch(&g_tune, 40,
+    return serviceDispatchIn(&g_tune, 40, tmp,
         .buffer_attrs = { SfBufferAttr_In | SfBufferAttr_HipcMapAlias },
         .buffers = { { path, path_length } },
     );
 }
 
-Result tuneRemove(const char *path) {
-    size_t path_length = strlen(path);
-    return serviceDispatch(&g_tune, 41,
-        .buffer_attrs = { SfBufferAttr_In | SfBufferAttr_HipcMapAlias },
-        .buffers = { { path, path_length } },
-    );
+Result tuneRemove(u32 index) {
+    return serviceDispatchIn(&g_tune, 41, index);
+}
+
+Result tuneGetApiVersion(u32 *version) {
+    return serviceDispatchOut(&g_tune, 5000, *version);
 }

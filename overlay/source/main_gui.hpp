@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../ipc/music.h"
+#include "../../ipc/tune.h"
 #include "status_bar.hpp"
 
 #include <tesla.hpp>

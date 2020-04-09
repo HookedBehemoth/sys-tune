@@ -1,4 +1,6 @@
 #include "impl/music_player.hpp"
+
+#ifdef SYS
 #include "music_control_service.hpp"
 
 extern "C" {
@@ -89,16 +91,16 @@ int main(int argc, char *argv[]) {
 
     /* Get pm module to listen for state change. */
     PscPmModule pm_module;
-    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, 1, false));
+    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, sizeof(dependencies) / sizeof(u16), true));
 
     /* Get GPIO session for the headphone jack pad. */
     GpioPadSession headphone_detect_session;
     R_ABORT_UNLESS(gpioOpenSession(&headphone_detect_session, GpioPadName(0x15)));
 
     os::Thread gpioThread, pscThread, audioThread;
-    R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, nullptr, 0x1000, 0x20));
-    R_ABORT_UNLESS(pscThread.Initialize(tune::impl::PscThreadFunc, nullptr, 0x1000, 0x20));
-    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::ThreadFunc, nullptr, 0x8000, 0x20));
+    R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, &headphone_detect_session, 0x1000, 0x20));
+    R_ABORT_UNLESS(pscThread.Initialize(tune::impl::PscThreadFunc, &pm_module, 0x1000, 0x20));
+    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::AudioThreadFunc, nullptr, 0x8000, 0x20));
 
     R_ABORT_UNLESS(gpioThread.Start());
     R_ABORT_UNLESS(pscThread.Start());
@@ -128,3 +130,100 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+#endif
+#ifdef APPLET
+
+namespace ams {
+
+    ncm::ProgramId CurrentProgramId = {0x4200000000000000};
+
+    namespace result {
+
+        bool CallFatalOnResultAssertion = false;
+
+    }
+
+}
+
+using namespace ams;
+
+#include <unistd.h>
+
+#ifdef R_ABORT_UNLESS
+#undef R_ABORT_UNLESS
+#endif
+
+#define R_ABORT_UNLESS(res_expr)                                                                                               \
+    ({                                                                                                                         \
+        const auto res = static_cast<::ams::Result>((res_expr));                                                               \
+        if (R_FAILED(res))                                                                                                     \
+            std::printf("%s failed with 0x%x 2%03d-%04d\n", #res_expr, res.GetValue(), res.GetModule(), res.GetDescription()); \
+    })
+
+int main(int argc, char *argv[]) {
+    R_ABORT_UNLESS(gpioInitialize());
+    R_ABORT_UNLESS(audoutInitialize());
+    R_ABORT_UNLESS(socketInitializeDefault());
+    int sock = nxlinkStdio();
+
+    R_ABORT_UNLESS(tune::impl::Initialize());
+
+    /* Get GPIO session for the headphone jack pad. */
+    GpioPadSession headphone_detect_session;
+    R_ABORT_UNLESS(gpioOpenSession(&headphone_detect_session, GpioPadName(0x15)));
+
+    os::Thread gpioThread, audioThread;
+    R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, &headphone_detect_session, 0x1000, 0x20));
+    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::AudioThreadFunc, nullptr, 0x8000, 0x20));
+
+    R_ABORT_UNLESS(gpioThread.Start());
+    R_ABORT_UNLESS(audioThread.Start());
+
+    while (appletMainLoop()) {
+        hidScanInput();
+        u64 down = hidKeysDown(CONTROLLER_P1_AUTO);
+        if (down & KEY_A) {
+            ams::Result rc = tune::impl::Play();
+            std::printf("Play: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+        }
+
+        if (down & KEY_B) {
+            ams::Result rc = tune::impl::Pause();
+            std::printf("Pause: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+        }
+
+        constexpr const char path[] = "/music/hobbit/001 Der Hobbit.mp3";
+        if (down & KEY_MINUS) {
+            ams::Result rc = tune::impl::Enqueue(path, strlen(path), EnqueueType::Last);
+            std::printf("Enqueue: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+        }
+
+        if (down & KEY_PLUS)
+            break;
+
+        if (down & KEY_RIGHT)
+            tune::impl::Next();
+
+        if (down & KEY_LEFT)
+            tune::impl::Prev();
+    }
+
+    tune::impl::Exit();
+
+    R_ABORT_UNLESS(gpioThread.Wait());
+    R_ABORT_UNLESS(audioThread.Wait());
+
+    R_ABORT_UNLESS(gpioThread.Join());
+    R_ABORT_UNLESS(audioThread.Join());
+
+    /* Close gpio session. */
+    gpioPadClose(&headphone_detect_session);
+
+    close(sock);
+    socketExit();
+    audoutExit();
+    gpioExit();
+}
+
+#endif

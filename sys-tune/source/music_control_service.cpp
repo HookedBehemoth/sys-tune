@@ -4,87 +4,91 @@
 
 namespace ams::tune {
 
-    Result GetStatus(sf::Out<AudioOutState> out) {
+    Result ControlService::GetStatus(sf::Out<AudioOutState> out) {
         return impl::GetStatus(out.GetPointer());
     }
 
-    Result Play() {
+    Result ControlService::Play() {
         return impl::Play();
     }
 
-    Result Pause() {
+    Result ControlService::Pause() {
         return impl::Pause();
     }
 
-    Result Next() {
+    Result ControlService::Next() {
         impl::Next();
         return ResultSuccess();
     }
 
-    Result Prev() {
+    Result ControlService::Prev() {
         impl::Prev();
         return ResultSuccess();
     }
 
-    Result GetVolume(sf::Out<float> out) {
+    Result ControlService::GetVolume(sf::Out<float> out) {
         return impl::GetVolume(out.GetPointer());
     }
 
-    Result SetVolume(float volume) {
+    Result ControlService::SetVolume(float volume) {
         return impl::SetVolume(volume);
     }
 
-    Result GetRepeatMode(sf::Out<RepeatMode> mode) {
+    Result ControlService::GetRepeatMode(sf::Out<RepeatMode> mode) {
         impl::GetRepeatMode(mode.GetPointer());
         return ResultSuccess();
     }
 
-    Result SetRepeatMode(RepeatMode mode) {
+    Result ControlService::SetRepeatMode(RepeatMode mode) {
         impl::SetRepeatMode(mode);
         return ResultSuccess();
     }
 
-    Result GetShuffleMode(sf::Out<ShuffleMode> mode) {
+    Result ControlService::GetShuffleMode(sf::Out<ShuffleMode> mode) {
         impl::GetShuffleMode(mode.GetPointer());
         return ResultSuccess();
     }
 
-    Result SetShuffleMode(ShuffleMode mode) {
+    Result ControlService::SetShuffleMode(ShuffleMode mode) {
         impl::SetShuffleMode(mode);
         return ResultSuccess();
     }
 
-    Result GetCurrentPlaylistSize(sf::Out<u32> size) {
+    Result ControlService::GetCurrentPlaylistSize(sf::Out<u32> size) {
         impl::GetCurrentPlaylistSize(size.GetPointer());
         return ResultSuccess();
     }
 
-    Result GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
+    Result ControlService::GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
         impl::GetCurrentPlaylist(size.GetPointer(), (char*)buffer.GetPointer(), buffer.GetSize());
         return ResultSuccess();
     }
 
-    Result GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer) {
+    Result ControlService::GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer) {
         return impl::GetCurrentQueueItem(out.GetPointer(), (char*)buffer.GetPointer(), buffer.GetSize());
     }
 
-    Result ClearQueue() {
+    Result ControlService::ClearQueue() {
         impl::ClearQueue();
         return ResultSuccess();
     }
 
-    Result MoveQueueItem(u32 src, u32 dst) {
+    Result ControlService::MoveQueueItem(u32 src, u32 dst) {
         impl::MoveQueueItem(src, dst);
         return ResultSuccess();
     }
 
-    Result Remove(sf::InBuffer buffer) {
-        impl::Remove((char*)buffer.GetPointer(), buffer.GetSize());
+    Result ControlService::Select(u32 index) {
+        impl::Select(index);
         return ResultSuccess();
     }
 
-    Result Enqueue(sf::InBuffer buffer, EnqueueType type) {
+    Result ControlService::Enqueue(sf::InBuffer buffer, EnqueueType type) {
         return impl::Enqueue((char*)buffer.GetPointer(), buffer.GetSize(), type);
+    }
+
+    Result ControlService::Remove(u32 index) {
+        return impl::Remove(index);
     }
 
 }

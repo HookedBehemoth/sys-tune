@@ -7,7 +7,7 @@ namespace ams::tune::impl {
     Result Initialize();
     void Exit();
 
-    void ThreadFunc(void *);
+    void AudioThreadFunc(void *);
     void PscThreadFunc(void *ptr);
     void GpioThreadFunc(void *ptr);
 
@@ -30,8 +30,9 @@ namespace ams::tune::impl {
     Result GetCurrentQueueItem(CurrentStats *out, char* buffer, size_t buffer_size);
     void ClearQueue();
     void MoveQueueItem(u32 src, u32 dst);
+    void Select(u32 index);
 
-    Result Enqueue(char* buffer, size_t buffer_length, EnqueueType type);
-    void Remove(char* buffer, size_t buffer_length);
+    Result Enqueue(const char* buffer, size_t buffer_length, EnqueueType type);
+    Result Remove(u32 index);
 
 }

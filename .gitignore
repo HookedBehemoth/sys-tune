@@ -1,6 +1,7 @@
 *.elf
 *.nso
 *.nsp
+*.nro
 *.nacp
 *.ovl
 .vscode

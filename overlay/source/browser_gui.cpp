@@ -1,6 +1,6 @@
 #include "browser_gui.hpp"
 
-#include "../../ipc/music.h"
+#include "../../ipc/tune.h"
 #include "select_list_item.hpp"
 
 constexpr const char *const base_path = "/music/";
@@ -70,7 +70,7 @@ void BrowserGui::scanCwd() {
             } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
                 this->m_list->addItem(new SelectListItem(elm.name, [&](const std::string &text) {
                     std::snprintf(path_buffer, FS_MAX_PATH, "%s%s", this->cwd, text.c_str());
-                    musicAddToQueue(path_buffer);
+                    tuneEnqueue(path_buffer, TuneEnqueueType_Last);
                 }));
             }
         }

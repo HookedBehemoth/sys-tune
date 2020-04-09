@@ -26,9 +26,12 @@ namespace ams::tune {
             GetCurrentQueueItem = 32,
             ClearQueue = 33,
             MoveQueueItem = 34,
+            Select = 35,
 
             Enqueue = 40,
             Remove = 41,
+
+            GetApiVersion = 5000,
         };
 
       public:
@@ -46,14 +49,20 @@ namespace ams::tune {
         virtual Result GetShuffleMode(sf::Out<ShuffleMode> mode);
         virtual Result SetShuffleMode(ShuffleMode mode);
 
-        virtual Result MoveQueueItem(u32 src, u32 dst);
-        virtual Result ClearQueue();
         virtual Result GetCurrentPlaylistSize(sf::Out<u32> size);
         virtual Result GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer);
         virtual Result GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer);
+        virtual Result ClearQueue();
+        virtual Result MoveQueueItem(u32 src, u32 dst);
+        virtual Result Select(u32 index);
 
         virtual Result Enqueue(sf::InBuffer buffer, EnqueueType type);
-        virtual Result Remove(sf::InBuffer buffer);
+        virtual Result Remove(u32 index);
+
+        virtual Result GetApiVersion(sf::Out<u32> version) {
+            version.SetValue(0);
+            return ResultSuccess();
+        }
 
       public:
         DEFINE_SERVICE_DISPATCH_TABLE{
@@ -76,9 +85,12 @@ namespace ams::tune {
             MAKE_SERVICE_COMMAND_META(GetCurrentQueueItem),
             MAKE_SERVICE_COMMAND_META(ClearQueue),
             MAKE_SERVICE_COMMAND_META(MoveQueueItem),
+            MAKE_SERVICE_COMMAND_META(Select),
 
             MAKE_SERVICE_COMMAND_META(Enqueue),
             MAKE_SERVICE_COMMAND_META(Remove),
+
+            MAKE_SERVICE_COMMAND_META(GetApiVersion),
         };
     };
 

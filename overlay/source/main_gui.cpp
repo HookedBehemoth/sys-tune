@@ -7,10 +7,11 @@ namespace {
 
     char path_buffer[FS_MAX_PATH] = "";
     constexpr const size_t num_steps = 20;
+    constexpr const float max_volume = 2;
 
     void volumeCallback(u8 value) {
-        double music_volume = double(value) / num_steps;
-        musicSetVolume(music_volume);
+        float music_volume = (float(value) / num_steps) * max_volume;
+        tuneSetVolume(music_volume);
     }
 
 }
@@ -19,10 +20,13 @@ MainGui::MainGui() : m_progress_text(" 0:00"), m_total_text(" 0:00") {
     m_status_bar = new StatusBar(path_buffer, this->m_progress_text, this->m_total_text);
     m_volume_slider = new tsl::elm::StepTrackBar("\uE13C", num_steps);
     /* Get initial volume. */
-    double volume = 0;
-    musicGetVolume(&volume);
-    this->m_volume_slider->setProgress(volume * 100);
-    this->m_volume_slider->setValueChangedListener(volumeCallback);
+    float volume = 0;
+    if (R_SUCCEEDED(tuneGetVolume(&volume))) {
+        this->m_volume_slider->setProgress((volume / max_volume) * num_steps);
+        this->m_volume_slider->setValueChangedListener(volumeCallback);
+    } else {
+        this->m_volume_slider->setProgress(0);
+    }
 }
 
 tsl::elm::Element *MainGui::createUI() {
@@ -68,13 +72,13 @@ tsl::elm::Element *MainGui::createUI() {
 void MainGui::update() {
     static u8 counter = 0;
     if ((counter % 15) == 0) {
-        MusicPlayerStatus status = MusicPlayerStatus_Stopped;
-        musicGetStatus(&status);
-        MusicCurrentTune tune;
-        if (R_SUCCEEDED(musicGetCurrent(path_buffer, FS_MAX_PATH, &tune))) {
+        AudioOutState status = AudioOutState_Stopped;
+        tuneGetStatus(&status);
+        TuneCurrentStats stats;
+        if (R_SUCCEEDED(tuneGetCurrentQueueItem(path_buffer, FS_MAX_PATH, &stats))) {
             /* Progress text and bar */
-            double total = tune.tpf * tune.total_frame_count;
-            double progress = tune.tpf * tune.progress_frame_count;
+            double total = stats.tpf * stats.total_frame_count;
+            double progress = stats.tpf * stats.progress_frame_count;
             std::snprintf(this->m_progress_text, 0x10, "%2d:%02d", MIN(progress), SEC(progress));
             std::snprintf(this->m_total_text, 0x10, "%2d:%02d", MIN(total), SEC(total));
             double percentage = progress / total;
