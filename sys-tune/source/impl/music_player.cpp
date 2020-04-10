@@ -542,7 +542,7 @@ namespace ams::tune::impl {
         R_UNLESS(index < queue.size(), ResultOutOfRange());
 
         /* Get iterator for index position. */
-        auto track = queue.cbegin() + g_queue_position;
+        auto track = queue.cbegin() + index;
 
         /* Fetch a new track if we deleted the current song. */
         bool fetch_new = g_queue_position == index;
