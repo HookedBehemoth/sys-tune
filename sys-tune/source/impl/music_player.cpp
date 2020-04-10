@@ -64,16 +64,13 @@ namespace ams::tune::impl {
             /* Wait for all buffers to finish playing. */
             u32 count;
             while (R_SUCCEEDED(audoutGetAudioOutBufferCount(&count)) && count > 0) {
-                std::printf("There are: %d buffers remaining\n", count);
+                LOG("There are: %d buffers remaining\n", count);
                 AudioOutBuffer *released;
                 R_TRY(audoutWaitPlayFinish(&released, &count, UINT64_MAX));
             }
             /* Stop audio playback. */
             R_TRY(audoutStopAudioOut());
             audout_state = AudioOutState_Stopped;
-            bool flushed;
-            R_TRY(audoutFlushAudioOutBuffers(&flushed));
-            std::printf("flushed: %s\n", flushed ? "true" : "false");
             return ResultSuccess();
         }
 
@@ -111,16 +108,18 @@ namespace ams::tune::impl {
             MPG_TRY(mpg123_format_none(music_handle));
             MPG_TRY(mpg123_format(music_handle, rate, channels, encoding));
 
-            /* Get length of track in frames. */
-            off_t frame_count = mpg123_framelength(music_handle);
-            R_UNLESS(frame_count != MPG123_ERR, ResultMpgFailure());
-            g_total_frame_count = frame_count;
-
             /* Get length of frame in seconds. */
             double tpf = mpg123_tpf(music_handle);
             R_UNLESS(tpf >= 0, ResultMpgFailure());
-            g_tpf = tpf;
 
+            /* Get length of track in frames. */
+            off_t frame_count = mpg123_framelength(music_handle);
+            R_UNLESS(frame_count != MPG123_ERR, ResultMpgFailure());
+
+            LOG("predicted length: %lf seconds\n", tpf * frame_count);
+
+            g_total_frame_count = frame_count;
+            g_tpf = tpf;
             /* Reset frame information on exit. */
             ON_SCOPE_EXIT {
                 g_tpf = 0;
@@ -139,27 +138,10 @@ namespace ams::tune::impl {
             if (buffer_count > 0x20)
                 buffer_count = 0x20;
 
-            struct ScopedOutBuffer {
-                NON_COPYABLE(ScopedOutBuffer);
-                NON_MOVEABLE(ScopedOutBuffer);
-                AudioOutBuffer buffer;
-                ScopedOutBuffer() : buffer({}) {}
-                bool init(size_t buffer_size) {
-                    buffer.buffer = memalign(0x1000, buffer_size);
-                    buffer.buffer_size = buffer_size;
-                    return buffer.buffer;
-                }
-                ~ScopedOutBuffer() {
-                    if (buffer.buffer)
-                        free(buffer.buffer);
-                }
-            };
-
             ScopedOutBuffer buffers[buffer_count];
             for (auto &buffer : buffers) {
                 R_UNLESS(buffer.init(buffer_size), MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-                R_TRY(AppendBuffer(&buffer.buffer));
-                std::printf("Buffer address: 0x%p\n", &buffer.buffer);
+                LOG("Buffer address: 0x%p\n", &buffer.buffer);
             }
 
             while (should_run && g_status == PlayerStatus::Playing) {
@@ -179,7 +161,7 @@ namespace ams::tune::impl {
                         if (R_SUCCEEDED(audoutContainsAudioOutBuffer(&buffer.buffer, &appended)) && !appended) {
                             AppendBuffer(&buffer.buffer);
                         }
-                        std::printf("buffer: 0x%p: appended: %s\n", &buffer.buffer, appended ? "true" : "false");
+                        LOG("buffer: 0x%p: appended: %s\n", &buffer.buffer, appended ? "true" : "false");
                     }
                 }
 
@@ -210,9 +192,6 @@ namespace ams::tune::impl {
     }
 
     Result Initialize() {
-        u64 seed[2];
-        envGetRandomSeed(seed);
-        urng = std::mt19937(seed[0]);
         should_run = true;
         g_status = PlayerStatus::FetchNext;
 
@@ -254,7 +233,7 @@ namespace ams::tune::impl {
                 continue;
             }
 
-            std::printf("Index: %d, track: %s\n", g_queue_position, next_track.c_str());
+            LOG("Index: %d, track: %s\n", g_queue_position, next_track.c_str());
 
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
@@ -266,12 +245,6 @@ namespace ams::tune::impl {
                 Remove(g_queue_position);
                 FILE *file = fopen("sdmc:/music.log", "a");
                 if (AMS_LIKELY(file)) {
-                    u64 timestamp;
-                    if (R_SUCCEEDED(timeGetCurrentTime(TimeType_LocalSystemClock, &timestamp))) {
-                        TimeCalendarTime caltime = {};
-                        if (R_SUCCEEDED(timeToCalendarTimeWithMyRule(timestamp, &caltime, nullptr)))
-                            fprintf(file, "[%2d:%02d:%02d] ", caltime.hour, caltime.minute, caltime.second);
-                    }
                     if (rc.GetValue() == ResultMpgFailure().GetValue()) {
                         if (!mpg123_desc)
                             mpg123_desc = "UNKNOWN";
@@ -286,13 +259,9 @@ namespace ams::tune::impl {
                             fprintf(file, "played sample count: %ld\n", sample_count);
 
                         SilentPauseImpl();
-                        audoutFlushAudioOutBuffers(nullptr);
                     }
                     fclose(file);
                 }
-                //std::printf("PlayTrack: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
-                //std::printf("mpg error: %s\n", mpg123_desc);
-                //svcSleepThread(10'000'000'000);
             }
         }
 
@@ -352,14 +321,6 @@ namespace ams::tune::impl {
             svcSleepThread(10'000'000);
         }
     }
-
-    Result ShuffleImpl() {
-        std::shuffle(g_playlist.begin(), g_playlist.end(), urng);
-
-        return ResultSuccess();
-    }
-
-    /* NEW */
 
     Result GetStatus(AudioOutState *out) {
         return audoutGetAudioOutState(out);
@@ -539,6 +500,9 @@ namespace ams::tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
+            if (g_queue_position == index)
+                return;
+
             size_t queue_size = g_playlist.size();
 
             if (index >= queue_size) {
@@ -565,10 +529,6 @@ namespace ams::tune::impl {
         } else {
             g_playlist.push_back(buffer);
         }
-
-        /* DEBUG */
-        for (auto &entry : g_playlist)
-            std::printf("Playlist: %s\n", entry.c_str());
 
         return ResultSuccess();
     }
@@ -597,10 +557,6 @@ namespace ams::tune::impl {
 
         if (fetch_new)
             g_status = PlayerStatus::FetchNext;
-
-        /* DEBUG */
-        for (auto &entry : g_playlist)
-            std::printf("Playlist: %s\n", entry.c_str());
 
         return ResultSuccess();
     }

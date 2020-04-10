@@ -25,3 +25,9 @@ namespace ams::kern {
     R_DEFINE_ERROR_RESULT(WaitTimeout, 117);
 
 }
+
+#ifndef RELEASE
+#define LOG(fmt, ...) std::printf(fmt, __VA_ARGS__);
+#else
+#define LOG(fmt, ...)
+#endif

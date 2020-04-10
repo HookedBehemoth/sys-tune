@@ -10,7 +10,7 @@ u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 u32 __nx_fsdev_direntry_cache_size = 1;
 
-#define INNER_HEAP_SIZE 0x40000
+#define INNER_HEAP_SIZE 0x30000
 size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 char nx_inner_heap[INNER_HEAP_SIZE];
 
@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     os::Thread audioThread;
     R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, &headphone_detect_session, 0x1000, 0x20));
     //R_ABORT_UNLESS(pscThread.Initialize(tune::impl::PscThreadFunc, &pm_module, 0x1000, 0x20));
-    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::AudioThreadFunc, nullptr, 0x8000, 0x20));
+    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::AudioThreadFunc, nullptr, 0x2000, 0x20));
 
     R_ABORT_UNLESS(gpioThread.Start());
     //R_ABORT_UNLESS(pscThread.Start());
@@ -195,9 +195,9 @@ int main(int argc, char *argv[]) {
             std::printf("Pause: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
         }
 
-        constexpr const char path[] = "/music/hobbit/001 Der Hobbit.mp3";
+        constexpr const char path[] = "/music/misc/Dj CUTMAN - The Legend of Dubstep.mp3";
         if (down & KEY_MINUS) {
-            ams::Result rc = tune::impl::Enqueue(path, strlen(path), EnqueueType::Last);
+            ams::Result rc = tune::impl::Enqueue(path, strlen(path), tune::EnqueueType::Last);
             std::printf("Enqueue: 0x%x 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
         }
 

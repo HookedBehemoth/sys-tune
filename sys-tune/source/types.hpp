@@ -4,25 +4,45 @@
 
 #include <stratosphere.hpp>
 
-enum class PlayerStatus : u8 {
-    Playing,
-    FetchNext,
-};
+namespace ams::tune {
 
-enum class ShuffleMode : u8 {
-    Off,
-    On,
-};
+    enum class PlayerStatus : u8 {
+        Playing,
+        FetchNext,
+    };
 
-enum class RepeatMode : u8 {
-    Off,
-    One,
-    All,
-};
+    enum class ShuffleMode : u8 {
+        Off,
+        On,
+    };
 
-enum class EnqueueType : u8 {
-    Next,
-    Last,
-};
+    enum class RepeatMode : u8 {
+        Off,
+        One,
+        All,
+    };
 
-struct CurrentStats : TuneCurrentStats {};
+    enum class EnqueueType : u8 {
+        Next,
+        Last,
+    };
+
+    struct ScopedOutBuffer {
+        NON_COPYABLE(ScopedOutBuffer);
+        NON_MOVEABLE(ScopedOutBuffer);
+        AudioOutBuffer buffer;
+        ScopedOutBuffer() : buffer({}) {}
+        bool init(size_t buffer_size) {
+            buffer.buffer = aligned_alloc(0x1000, buffer_size);
+            buffer.buffer_size = buffer_size;
+            return buffer.buffer;
+        }
+        ~ScopedOutBuffer() {
+            if (buffer.buffer)
+                free(buffer.buffer);
+        }
+    };
+
+    struct CurrentStats : TuneCurrentStats {};
+
+}

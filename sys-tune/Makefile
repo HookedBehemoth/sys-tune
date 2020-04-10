@@ -4,7 +4,7 @@
 include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/Atmosphere-libs/config/templates/stratosphere.mk
 
 export LIBS		+=	-lmpg123
-export DEFINES	+=	-DTUNE_API_VERSION=$(API_VERSION) -DSYS
+export DEFINES	+=	-DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
