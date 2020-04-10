@@ -53,6 +53,8 @@ namespace ams::tune::impl {
             size_t data_size;
             MPG_TRY(mpg123_read(music_handle, (u8 *)buffer->buffer, buffer->buffer_size, &data_size));
             buffer->data_size = data_size;
+            armDCacheFlush(buffer->buffer, data_size);
+
             /* Append the decoded audio buffer. */
             return audoutAppendAudioOutBuffer(buffer);
         };
@@ -222,7 +224,6 @@ namespace ams::tune::impl {
         /* Set parameters. */
         MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
         MPG_TRY(mpg123_param(music_handle, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
-        MPG_TRY(mpg123_volume(music_handle, 0.4));
 
         return ResultSuccess();
     }
@@ -407,7 +408,7 @@ namespace ams::tune::impl {
             double base, real, rva;
             if (mpg123_getvolume(music_handle, &base, &real, &rva) != MPG123_OK)
                 return ResultMpgFailure();
-            *volume = (real * 2);
+            *volume = real;
             return ResultSuccess();
         }
 
@@ -423,8 +424,9 @@ namespace ams::tune::impl {
         }
 
         if (hosversionBefore(6, 0, 0)) {
-            if (mpg123_volume(music_handle, volume / 2) != MPG123_OK)
+            if (mpg123_volume(music_handle, volume) != MPG123_OK)
                 return ResultMpgFailure();
+            return ResultSuccess();
         }
         return audoutSetAudioOutVolume(volume);
     }
