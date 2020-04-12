@@ -25,6 +25,7 @@ dist: all
 	mkdir dist/atmosphere/contents/4200000000000000/flags
 	touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
+	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/toolbox.json
 	mkdir dist/switch
 	mkdir dist/switch/.overlays
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
