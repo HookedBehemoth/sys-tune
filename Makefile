@@ -17,19 +17,12 @@ module:
 	$(MAKE) -C sys-tune
 
 dist: all
-	rm -rf dist
-	mkdir dist
-	mkdir dist/atmosphere
-	mkdir dist/atmosphere/contents
-	mkdir dist/atmosphere/contents/4200000000000000
-	mkdir dist/atmosphere/contents/4200000000000000/flags
+	mkdir -p dist/switch/.overlays
+	mkdir -p dist/atmosphere/contents/4200000000000000/flags
 	touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/toolbox.json
-	mkdir dist/switch
-	mkdir dist/switch/.overlays
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 	zip -r sys-tune-$(VERSION)-$(GITHASH).zip dist
-	rm -r dist
 
 .PHONY: all overlay module

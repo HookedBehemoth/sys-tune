@@ -4,6 +4,12 @@
 
 #include "list_items.hpp"
 
+namespace {
+
+    bool ListItemTextCompare(const tsl::elm::ListItem *_lhs, const tsl::elm::ListItem *_rhs){
+        return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
+    };
+}
 constexpr const char *const base_path = "/music/";
 
 char path_buffer[FS_MAX_PATH];
@@ -93,19 +99,15 @@ void BrowserGui::scanCwd() {
         if (folders.size() == 0 && files.size() == 0) {
             this->m_list->addItem(new tsl::elm::CategoryHeader("Empty..."));
         }
-        constexpr const auto list_item_compare = [](const tsl::elm::ListItem *_lhs, const tsl::elm::ListItem *_rhs) {
-            return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
-        };
-        ;
+
         if (folders.size() > 0) {
-            this->m_list->addItem(new tsl::elm::CategoryHeader("Folders"));
-            std::sort(folders.begin(), folders.end(), list_item_compare);
+            std::sort(folders.begin(), folders.end(), ListItemTextCompare);
             for (auto element : folders)
                 this->m_list->addItem(element);
         }
         if (files.size() > 0) {
             this->m_list->addItem(new tsl::elm::CategoryHeader("Files"));
-            std::sort(files.begin(), files.end(), list_item_compare);
+            std::sort(files.begin(), files.end(), ListItemTextCompare);
             for (auto element : files)
                 this->m_list->addItem(element);
         }

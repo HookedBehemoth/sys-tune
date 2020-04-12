@@ -39,6 +39,15 @@ QueueGui::QueueGui() {
                     if (R_SUCCEEDED(tuneRemove(index))) {
                         this->removeFocus();
                         this->m_list->removeIndex(index);
+                        auto *element = this->m_list->getItemAtIndex(index + 1);
+                        if (element != nullptr) {
+                            this->requestFocus(element, tsl::FocusDirection::Down);
+                            this->m_list->setFocusedIndex(index + 1);
+                        } else if (index > 0) {
+                            element = this->m_list->getItemAtIndex(index - 1);
+                            this->requestFocus(element, tsl::FocusDirection::Up);
+                            this->m_list->setFocusedIndex(index - 1);
+                        }
                     }
 
                     counter++;
