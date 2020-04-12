@@ -45,13 +45,13 @@ class StatusBar : public tsl::elm::Element {
         return (tsl::style::ListItemDefaultHeight * line) + (tsl::style::ListItemDefaultHeight / 2);
     }
     inline ALWAYS_INLINE s32 GetRepeatX() {
-        return this->getX() + (this->getWidth() / 2) - 70;
+        return this->getX() + (this->getWidth() / 2) - 50;
     }
     inline ALWAYS_INLINE s32 GetRepeatY() {
         return this->getY() + CenterOfLine(1);
     }
     inline ALWAYS_INLINE s32 GetShuffleX() {
-        return this->getX() + (this->getWidth() / 2) + 70;
+        return this->getX() + (this->getWidth() / 2) + 50;
     }
     inline ALWAYS_INLINE s32 GetShuffleY() {
         return this->getY() + CenterOfLine(1);

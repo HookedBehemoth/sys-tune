@@ -4,7 +4,6 @@
 
 class QueueGui : public tsl::Gui {
   private:
-    u32 count;
     tsl::elm::List *m_list;
 
   public:

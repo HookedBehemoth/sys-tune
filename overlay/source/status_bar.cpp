@@ -55,14 +55,14 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
 
     /* Seek bar. */
     u32 bar_length = this->getWidth() - 30;
-    renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 2, bar_length, 3, 0xffff);
+    renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight, bar_length, 3, 0xffff);
 
-    renderer->drawCircle(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 3, 3, true, 0xf00f);
-    renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight, bar_length * this->m_percentage, 7, 0xf00f);
-    renderer->drawCircle(this->getX() + 15 + bar_length * this->m_percentage, this->getY() + tsl::style::ListItemDefaultHeight + 3, 3, true, 0xf00f);
+    renderer->drawCircle(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
+    renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight - 2, bar_length * this->m_percentage, 7, 0xf00f);
+    renderer->drawCircle(this->getX() + 15 + bar_length * this->m_percentage, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
 
     /* Progress */
-    renderer->drawString(this->m_progress_text, false, this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 35, 20, 0xffff);
+    renderer->drawString(this->m_progress_text, false, this->getX() + 15, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
 
     /* Repeat indicator */
     auto repeat_color = this->m_repeat ? tsl::style::color::ColorHighlight : tsl::style::color::ColorHeaderBar;
@@ -77,7 +77,7 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     symbol::shuffle::symbol.draw(GetShuffleX(), GetShuffleY(), renderer, shuffle_color);
 
     /* Song length */
-    renderer->drawString(this->m_total_text, false, this->getX() + this->getWidth() - 75, this->getY() + tsl::style::ListItemDefaultHeight + 35, 20, 0xffff);
+    renderer->drawString(this->m_total_text, false, this->getX() + this->getWidth() - 75, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
 
     /* Prev button */
     symbol::prev::symbol.draw(GetPrevX(), GetPrevY(), renderer, tsl::style::color::ColorText);
@@ -118,7 +118,7 @@ bool StatusBar::onClick(u64 keys) {
     return handled;
 }
 
-#define TOUCHED(button) (currX > (Get##button##X() - 20) && currX < (Get##button##X() + 20) && prevY > (Get##button##Y() - 20) && prevY < (Get##button##Y() + 20))
+#define TOUCHED(button) (currX > (Get##button##X() - 30) && currX < (Get##button##X() + 30) && prevY > (Get##button##Y() - 30) && prevY < (Get##button##Y() + 30))
 
 bool StatusBar::onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
     if (event == tsl::elm::TouchEvent::Touch)

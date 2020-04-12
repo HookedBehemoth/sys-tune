@@ -1,6 +1,7 @@
 #include "queue_gui.hpp"
 
 #include "../../ipc/tune.h"
+#include "remove_list_item.hpp"
 
 namespace {
 
@@ -10,11 +11,13 @@ namespace {
 
 }
 
-QueueGui::QueueGui() : count() {
+QueueGui::QueueGui() {
     m_list = new tsl::elm::List();
+
+    u32 count;
     if (R_SUCCEEDED(tuneGetCurrentPlaylist(&count, queue_buffer, queue_size))) {
         char *ptr = queue_buffer;
-        for (u32 i = 0; i < std::min(this->count, queue_count); i++) {
+        for (u32 i = 0; i < std::min(count, queue_count); i++) {
             const char *str = ptr;
             size_t length = std::strlen(ptr);
             ptr[length - 4] = '\0';
@@ -24,15 +27,19 @@ QueueGui::QueueGui() : count() {
                     break;
                 }
             }
-            auto *item = new tsl::elm::ListItem(str);
-            item->setClickListener([i, this](u64 keys) -> bool {
+            auto *item = new RemoveListItem(str);
+            item->setClickListener([this, item](u64 keys) -> bool {
+                u32 index = this->m_list->getIndexInList(item);
                 u8 counter = 0;
                 if (keys & KEY_A) {
-                    tuneSelect(i);
+                    tuneSelect(index);
                     counter++;
                 }
                 if (keys & KEY_Y) {
-                    tuneRemove(i);
+                    if (R_SUCCEEDED(tuneRemove(index))) {
+                        this->removeFocus();
+                        this->m_list->removeIndex(index);
+                    }
 
                     counter++;
                 }
