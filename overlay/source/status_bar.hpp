@@ -41,37 +41,37 @@ class StatusBar : public tsl::elm::Element {
     void Next();
 
   private:
-    inline ALWAYS_INLINE constexpr s32 CenterOfLine(u8 line) {
+    ALWAYS_INLINE constexpr s32 CenterOfLine(u8 line) {
         return (tsl::style::ListItemDefaultHeight * line) + (tsl::style::ListItemDefaultHeight / 2);
     }
-    inline ALWAYS_INLINE s32 GetRepeatX() {
+    ALWAYS_INLINE s32 GetRepeatX() {
         return this->getX() + (this->getWidth() / 2) - 50;
     }
-    inline ALWAYS_INLINE s32 GetRepeatY() {
+    ALWAYS_INLINE s32 GetRepeatY() {
         return this->getY() + CenterOfLine(1);
     }
-    inline ALWAYS_INLINE s32 GetShuffleX() {
+    ALWAYS_INLINE s32 GetShuffleX() {
         return this->getX() + (this->getWidth() / 2) + 50;
     }
-    inline ALWAYS_INLINE s32 GetShuffleY() {
+    ALWAYS_INLINE s32 GetShuffleY() {
         return this->getY() + CenterOfLine(1);
     }
-    inline ALWAYS_INLINE s32 GetPlayStateX() {
+    ALWAYS_INLINE s32 GetPlayStateX() {
         return this->getX() + (this->getWidth() / 2);
     }
-    inline ALWAYS_INLINE s32 GetPlayStateY() {
+    ALWAYS_INLINE s32 GetPlayStateY() {
         return this->getY() + CenterOfLine(2);
     }
-    inline ALWAYS_INLINE s32 GetPrevX() {
+    ALWAYS_INLINE s32 GetPrevX() {
         return this->getX() + ((this->getWidth() / 4) * 1);
     }
-    inline ALWAYS_INLINE s32 GetPrevY() {
+    ALWAYS_INLINE s32 GetPrevY() {
         return this->getY() + CenterOfLine(2);
     }
-    inline ALWAYS_INLINE s32 GetNextX() {
+    ALWAYS_INLINE s32 GetNextX() {
         return this->getX() + ((this->getWidth() / 4) * 3);
     }
-    inline ALWAYS_INLINE s32 GetNextY() {
+    ALWAYS_INLINE s32 GetNextY() {
         return this->getY() + CenterOfLine(2);
     }
     const AlphaSymbol &GetPlaybackSymbol();

@@ -4,23 +4,24 @@
 
 #include <tesla.hpp>
 
-class RemoveListItem : public tsl::elm::ListItem {
+class ButtonListItem : public tsl::elm::ListItem {
   public:
-    RemoveListItem(const std::string &text) : ListItem(text, "\uE098") {}
+    template <typename Text, typename Value>
+    ButtonListItem(const Text &text, const Value &value) : ListItem(text, value) {}
 
     virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
         if (event == tsl::elm::TouchEvent::Touch)
-            this->m_touched = currX > ELEMENT_LEFT_BOUND(this) && currX < ELEMENT_RIGHT_BOUND(this) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this);
+            this->m_touched = this->inBounds(currX, currY);
 
         if (event == tsl::elm::TouchEvent::Release && this->m_touched) {
             this->m_touched = false;
 
             if (Element::getInputMode() == tsl::InputMode::Touch) {
                 bool handled = false;
-                if (currX > ELEMENT_LEFT_BOUND(this) && currX < (ELEMENT_RIGHT_BOUND(this) - this->getHeight()) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this))
+                if (currX > this->getLeftBound() && currX < (this->getRightBound() - this->getHeight()) && currY > this->getTopBound() && currY < this->getBottomBound())
                     handled = this->onClick(KEY_A);
 
-                if (currX > (ELEMENT_LEFT_BOUND(this) + this->getHeight()) && currX < ELEMENT_RIGHT_BOUND(this) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this))
+                if (currX > (this->getLeftBound() + this->getHeight()) && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound())
                     handled = this->onClick(KEY_Y);
 
                 this->m_clickAnimationProgress = 0;

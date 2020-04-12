@@ -122,7 +122,7 @@ bool StatusBar::onClick(u64 keys) {
 
 bool StatusBar::onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
     if (event == tsl::elm::TouchEvent::Touch)
-        this->m_touched = currX > ELEMENT_LEFT_BOUND(this) && currX < (ELEMENT_RIGHT_BOUND(this)) && currY > ELEMENT_TOP_BOUND(this) && currY < (ELEMENT_BOTTOM_BOUND(this));
+        this->m_touched = this->inBounds(currX, currY);
 
     if (event == tsl::elm::TouchEvent::Release && this->m_touched) {
         this->m_touched = false;

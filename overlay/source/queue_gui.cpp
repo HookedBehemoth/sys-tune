@@ -1,7 +1,7 @@
 #include "queue_gui.hpp"
 
 #include "../../ipc/tune.h"
-#include "remove_list_item.hpp"
+#include "list_items.hpp"
 
 namespace {
 
@@ -27,7 +27,7 @@ QueueGui::QueueGui() {
                     break;
                 }
             }
-            auto *item = new RemoveListItem(str);
+            auto *item = new ButtonListItem(str, "\uE098");
             item->setClickListener([this, item](u64 keys) -> bool {
                 u32 index = this->m_list->getIndexInList(item);
                 u8 counter = 0;
