@@ -28,8 +28,10 @@ namespace ams::tune::impl {
 
     namespace {
 
-        std::mt19937 urng;
         std::vector<std::string> g_playlist;
+        std::vector<std::string> g_shuffle_playlist;
+        std::string empty_string;
+        std::string &g_current = empty_string;
         u32 g_queue_position;
         os::Mutex g_mutex;
 
@@ -215,30 +217,33 @@ namespace ams::tune::impl {
     void AudioThreadFunc(void *) {
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (should_run) {
-            std::string next_track = "";
+            g_current = empty_string;
             {
                 std::scoped_lock lk(g_mutex);
 
-                auto &queue = g_playlist;
+                auto &queue = (g_shuffle == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
                 size_t queue_size = queue.size();
-                if (g_queue_position >= queue_size) {
+                if (queue_size == 0) {
+                    g_current = empty_string;
+                } else if (g_queue_position >= queue_size) {
                     g_queue_position = queue_size - 1;
-                } else {
-                    next_track = queue[g_queue_position];
+                    continue;
+                } else  {
+                    g_current = queue[g_queue_position];
                 }
             }
 
             /* Sleep if queue is selected. */
-            if (next_track.empty()) {
+            if (g_current.empty()) {
                 svcSleepThread(100'000'000ul);
                 continue;
             }
 
-            LOG("Index: %d, track: %s\n", g_queue_position, next_track.c_str());
+            LOG("Index: %d, track: %s\n", g_queue_position, g_current.c_str());
 
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
-            Result rc = PlayTrack(next_track);
+            Result rc = PlayTrack(g_current);
 
             /* Log error. */
             if (R_FAILED(rc)) {
@@ -406,7 +411,15 @@ namespace ams::tune::impl {
     }
 
     void SetShuffleMode(ShuffleMode mode) {
-        /* TODO */
+        std::scoped_lock lk(g_mutex);
+
+        if (g_playlist.size() > 0 && g_shuffle != mode) {
+            auto &dst = (mode == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
+
+            auto it = std::find(dst.cbegin(), dst.cend(), g_current);
+            g_queue_position = it - dst.cbegin();
+        }
+
         g_shuffle = mode;
     }
 
@@ -421,9 +434,8 @@ namespace ams::tune::impl {
 
         u32 tmp = 0;
         size_t remaining = buffer_size / FS_MAX_PATH;
-        auto &queue = g_playlist;
-        /* Traverse queue and write to buffer. */
-        for (auto it = queue.cbegin(); it != queue.cend() && remaining; ++it) {
+        /* Traverse playlist and write to buffer. */
+        for (auto it = g_playlist.cbegin(); it != g_playlist.cend() && remaining; ++it) {
             std::strncpy(buffer, it->c_str(), FS_MAX_PATH);
             buffer += FS_MAX_PATH;
             remaining--;
@@ -435,13 +447,9 @@ namespace ams::tune::impl {
     Result GetCurrentQueueItem(CurrentStats *out, char *buffer, size_t buffer_size) {
         {
             std::scoped_lock lk(g_mutex);
-            auto &queue = g_playlist;
-            R_UNLESS(!queue.empty(), ResultQueueEmpty());
-            R_UNLESS(g_queue_position < queue.size(), ResultNotPlaying());
-            auto &track = queue[g_queue_position];
-            R_UNLESS(!track.empty(), ResultNotPlaying());
-            R_UNLESS(buffer_size >= track.size(), ResultInvalidArgument());
-            std::strcpy(buffer, track.c_str());
+            R_UNLESS(!g_current.empty(), ResultNotPlaying());
+            R_UNLESS(buffer_size >= g_current.size(), ResultInvalidArgument());
+            std::strcpy(buffer, g_current.c_str());
         }
 
         double progress_frame_count = mpg123_tellframe(music_handle);
@@ -459,6 +467,7 @@ namespace ams::tune::impl {
             std::scoped_lock lk(g_mutex);
 
             g_playlist.clear();
+            g_shuffle_playlist.clear();
         }
         g_status = PlayerStatus::FetchNext;
     }
@@ -466,8 +475,7 @@ namespace ams::tune::impl {
     void MoveQueueItem(u32 src, u32 dst) {
         std::scoped_lock lk(g_mutex);
 
-        auto &queue = g_playlist;
-        size_t queue_size = queue.size();
+        size_t queue_size = g_playlist.size();
 
         if (src >= queue_size) {
             src = queue_size - 1;
@@ -476,8 +484,8 @@ namespace ams::tune::impl {
             dst = queue_size - 1;
         }
 
-        auto source = queue.cbegin() + src;
-        auto dest = queue.cbegin() + dst;
+        auto source = g_playlist.cbegin() + src;
+        auto dest = g_playlist.cbegin() + dst;
 
         g_playlist.insert(dest, *source);
         g_playlist.erase(source);
@@ -526,10 +534,13 @@ namespace ams::tune::impl {
         std::scoped_lock lk(g_mutex);
 
         if (type == EnqueueType::Next) {
-            g_playlist.insert(g_playlist.cbegin() + 1, buffer);
+            g_playlist.emplace(g_playlist.cbegin(), buffer, buffer_length);
         } else {
-            g_playlist.push_back(buffer);
+            g_playlist.emplace_back(buffer, buffer_length);
         }
+        size_t shuffle_playlist_size = g_shuffle_playlist.size();
+        size_t shuffle_index = (shuffle_playlist_size > 1) ? (randomGet64() % shuffle_playlist_size) : 0;
+        g_shuffle_playlist.emplace(g_shuffle_playlist.cbegin() + shuffle_index, buffer, buffer_length);
 
         return ResultSuccess();
     }
@@ -537,19 +548,25 @@ namespace ams::tune::impl {
     Result Remove(u32 index) {
         std::scoped_lock lk(g_mutex);
 
-        auto &queue = g_playlist;
         /* Ensure we don't operate out of bounds. */
-        R_UNLESS(!queue.empty(), ResultQueueEmpty());
-        R_UNLESS(index < queue.size(), ResultOutOfRange());
+        R_UNLESS(!g_playlist.empty(), ResultQueueEmpty());
+        R_UNLESS(index < g_playlist.size(), ResultOutOfRange());
 
         /* Get iterator for index position. */
-        auto track = queue.cbegin() + index;
+        auto track = g_playlist.cbegin() + index;
+
+        auto shuffle_it = std::find(g_shuffle_playlist.cbegin(), g_shuffle_playlist.cend(), *track);
+
+        if (g_shuffle == ShuffleMode::On && shuffle_it != g_shuffle_playlist.cend())
+            index = shuffle_it - g_shuffle_playlist.cbegin();
 
         /* Fetch a new track if we deleted the current song. */
         bool fetch_new = g_queue_position == index;
 
         /* Remove entry. */
-        queue.erase(track);
+        g_playlist.erase(track);
+        if (shuffle_it != g_shuffle_playlist.cend())
+            g_shuffle_playlist.erase(shuffle_it);
 
         /* Lower current position if needed. */
         if (g_queue_position > index) {

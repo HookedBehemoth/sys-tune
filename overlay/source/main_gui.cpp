@@ -94,6 +94,8 @@ void MainGui::update() {
             }
             this->m_status_bar->update(status, path_buffer, percentage);
         } else {
+            std::strcpy(this->m_progress_text, "00:00");
+            std::strcpy(this->m_total_text, "00:00");
             this->m_status_bar->update(status, nullptr, 0);
         }
         counter = 0;
