@@ -30,8 +30,7 @@ namespace ams::tune::impl {
 
         std::vector<std::string> g_playlist;
         std::vector<std::string> g_shuffle_playlist;
-        std::string empty_string;
-        std::string &g_current = empty_string;
+        std::string g_current = "";
         u32 g_queue_position;
         os::Mutex g_mutex;
 
@@ -217,18 +216,18 @@ namespace ams::tune::impl {
     void AudioThreadFunc(void *) {
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (should_run) {
-            g_current = empty_string;
+            g_current = "";
             {
                 std::scoped_lock lk(g_mutex);
 
                 auto &queue = (g_shuffle == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
                 size_t queue_size = queue.size();
                 if (queue_size == 0) {
-                    g_current = empty_string;
+                    g_current = "";
                 } else if (g_queue_position >= queue_size) {
                     g_queue_position = queue_size - 1;
                     continue;
-                } else  {
+                } else {
                     g_current = queue[g_queue_position];
                 }
             }
@@ -248,7 +247,12 @@ namespace ams::tune::impl {
             /* Log error. */
             if (R_FAILED(rc)) {
                 /* Remove track if something went wrong. */
+                bool shuffle = g_shuffle == ShuffleMode::On;
+                if (shuffle)
+                    SetShuffleMode(ShuffleMode::Off);
                 Remove(g_queue_position);
+                if (shuffle)
+                    SetShuffleMode(ShuffleMode::On);
                 FILE *file = fopen("sdmc:/music.log", "a");
                 if (AMS_LIKELY(file)) {
                     if (rc.GetValue() == ResultMpgFailure().GetValue()) {
@@ -564,16 +568,18 @@ namespace ams::tune::impl {
 
         auto shuffle_it = std::find(g_shuffle_playlist.cbegin(), g_shuffle_playlist.cend(), *track);
 
-        if (g_shuffle == ShuffleMode::On && shuffle_it != g_shuffle_playlist.cend())
-            index = shuffle_it - g_shuffle_playlist.cbegin();
+        /* Remove entry. */
+        g_playlist.erase(track);
+
+        if (shuffle_it != g_shuffle_playlist.cend()) {
+            g_shuffle_playlist.erase(shuffle_it);
+
+            if (g_shuffle == ShuffleMode::On)
+                index = shuffle_it - g_shuffle_playlist.cbegin();
+        }
 
         /* Fetch a new track if we deleted the current song. */
         bool fetch_new = g_queue_position == index;
-
-        /* Remove entry. */
-        g_playlist.erase(track);
-        if (shuffle_it != g_shuffle_playlist.cend())
-            g_shuffle_playlist.erase(shuffle_it);
 
         /* Lower current position if needed. */
         if (g_queue_position > index) {
