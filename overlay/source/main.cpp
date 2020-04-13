@@ -12,17 +12,19 @@ class OverlayTest : public tsl::Overlay {
 
   public:
     virtual void initServices() override {
-        this->running = tuneIsRunning();
-        if (this->running) {
-            this->init_rc = tuneInitialize();
-            if (R_SUCCEEDED(this->init_rc)) {
-                u32 api;
-                if (R_SUCCEEDED(tuneGetApiVersion(&api))) {
-                    supported = api == TUNE_API_VERSION;
-                } else {
-                    supported = false;
-                }
+        this->init_rc = tuneInitialize();
+        if (R_SUCCEEDED(this->init_rc)) {
+            this->running = true;
+            u32 api;
+            if (R_SUCCEEDED(tuneGetApiVersion(&api))) {
+                supported = api == TUNE_API_VERSION;
+            } else {
+                supported = false;
             }
+        } else if (this->init_rc != MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
+            this->running = true;
+        } else {
+            this->running = false;
         }
     }
     virtual void exitServices() override {

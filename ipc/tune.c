@@ -4,21 +4,23 @@
 
 Service g_tune;
 
-bool tuneIsRunning() {
-    Handle handle;
-    SmServiceName tune = smEncodeName("tune");
-    Result rc = smRegisterService(&handle, tune, false, 1);
-
-    if (R_SUCCEEDED(rc)) {
-        smUnregisterService(tune);
-        return false;
-    } else {
-        return true;
-    }
+Result smAtmosphereHasService(bool *out, SmServiceName name) {
+    u8 tmp = 0;
+    Result rc = serviceDispatchInOut(smGetServiceSession(), 65100, name, tmp);
+    if (R_SUCCEEDED(rc) && out)
+        *out = tmp;
+    return rc;
 }
 
 Result tuneInitialize() {
-    return smGetService(&g_tune, "tune");
+    SmServiceName tune = smEncodeName("tune");
+    bool exists;
+    Result rc = smAtmosphereHasService(&exists, tune);
+    if (R_SUCCEEDED(rc) && exists)
+        rc = smGetServiceWrapper(&g_tune, tune);
+    else
+        rc = MAKERESULT(Module_Libnx, LibnxError_NotFound);
+    return rc;
 }
 
 void tuneExit() {
@@ -54,9 +56,10 @@ Result tuneSetVolume(float volume) {
 }
 
 Result tuneGetRepeatMode(TuneRepeatMode *state) {
-    u8 out=0;
+    u8 out = 0;
     Result rc = serviceDispatchOut(&g_tune, 20, out);
-    if (R_SUCCEEDED(rc) && state) *state = out;
+    if (R_SUCCEEDED(rc) && state)
+        *state = out;
     return rc;
 }
 
@@ -66,9 +69,10 @@ Result tuneSetRepeatMode(TuneRepeatMode state) {
 }
 
 Result tuneGetShuffleMode(TuneShuffleMode *state) {
-    u8 out=0;
+    u8 out = 0;
     Result rc = serviceDispatchOut(&g_tune, 22, out);
-    if (R_SUCCEEDED(rc) && state) *state = out;
+    if (R_SUCCEEDED(rc) && state)
+        *state = out;
     return rc;
 }
 Result tuneSetShuffleMode(TuneShuffleMode state) {
@@ -82,16 +86,14 @@ Result tuneGetCurrentPlaylistSize(u32 *count) {
 
 Result tuneGetCurrentPlaylist(u32 *read, char *out_path, size_t out_path_length) {
     return serviceDispatchOut(&g_tune, 31, *read,
-        .buffer_attrs = { SfBufferAttr_Out | SfBufferAttr_HipcMapAlias },
-        .buffers = { { out_path, out_path_length } },
-    );
+                              .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
+                              .buffers = {{out_path, out_path_length}}, );
 }
 
 Result tuneGetCurrentQueueItem(char *out_path, size_t out_path_length, TuneCurrentStats *out) {
     return serviceDispatchOut(&g_tune, 32, *out,
-        .buffer_attrs = { SfBufferAttr_Out | SfBufferAttr_HipcMapAlias },
-        .buffers = { { out_path, out_path_length } },
-    );
+                              .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
+                              .buffers = {{out_path, out_path_length}}, );
 }
 
 Result tuneClearQueue() {
@@ -102,7 +104,7 @@ Result tuneMoveQueueItem(u32 src, u32 dst) {
     const struct {
         u32 src;
         u32 dst;
-    } in = { src, dst };
+    } in = {src, dst};
     return serviceDispatchIn(&g_tune, 34, in);
 }
 
@@ -114,9 +116,8 @@ Result tuneEnqueue(const char *path, TuneEnqueueType type) {
     u8 tmp = type;
     size_t path_length = strlen(path);
     return serviceDispatchIn(&g_tune, 40, tmp,
-        .buffer_attrs = { SfBufferAttr_In | SfBufferAttr_HipcMapAlias },
-        .buffers = { { path, path_length } },
-    );
+                             .buffer_attrs = {SfBufferAttr_In | SfBufferAttr_HipcMapAlias},
+                             .buffers = {{path, path_length}}, );
 }
 
 Result tuneRemove(u32 index) {

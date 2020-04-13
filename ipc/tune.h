@@ -28,8 +28,6 @@ typedef struct {
     double progress_frame_count;
 } TuneCurrentStats;
 
-bool tuneIsRunning();
-
 Result tuneInitialize();
 
 void tuneExit();
