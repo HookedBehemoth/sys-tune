@@ -514,23 +514,33 @@ namespace ams::tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            if (g_shuffle == ShuffleMode::On) {
-                auto it = std::find(g_shuffle_playlist.cbegin(), g_shuffle_playlist.cend(), g_playlist[index]);
-                if (it != g_shuffle_playlist.cend())
-                    index = it - g_shuffle_playlist.cbegin();
-            }
-
-            if (g_queue_position == index)
-                return;
-
+            /* Check if we are out of bounds. */
             size_t queue_size = g_playlist.size();
-
             if (index >= queue_size) {
                 index = queue_size - 1;
             }
-            g_queue_position = index;
+
+            /* Get absolute position in current playlist. Independent of shufflemode. */
+            u32 pos = UINT32_MAX;
+            if (g_shuffle == ShuffleMode::On) {
+                auto it = std::find(g_shuffle_playlist.cbegin(), g_shuffle_playlist.cend(), g_playlist[index]);
+                if (it != g_shuffle_playlist.cend()) {
+                    pos = std::distance(it, g_shuffle_playlist.cbegin());
+                } else {
+                    return;
+                }
+            } else {
+                pos = index;
+            }
+
+            /* Return if that track is already selected. */
+            if (g_queue_position == pos)
+                return;
+
+            g_queue_position = pos;
         }
         g_status = PlayerStatus::FetchNext;
+        should_pause = false;
     }
 
     Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
@@ -546,6 +556,7 @@ namespace ams::tune::impl {
 
         if (type == EnqueueType::Next) {
             g_playlist.emplace(g_playlist.cbegin(), buffer, buffer_length);
+            g_queue_position++;
         } else {
             g_playlist.emplace_back(buffer, buffer_length);
         }
@@ -575,7 +586,7 @@ namespace ams::tune::impl {
             g_shuffle_playlist.erase(shuffle_it);
 
             if (g_shuffle == ShuffleMode::On)
-                index = shuffle_it - g_shuffle_playlist.cbegin();
+                index = std::distance(shuffle_it, g_shuffle_playlist.cbegin());
         }
 
         /* Fetch a new track if we deleted the current song. */
