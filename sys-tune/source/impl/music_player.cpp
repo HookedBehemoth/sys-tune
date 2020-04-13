@@ -284,24 +284,24 @@ namespace ams::tune::impl {
 
         /* Don't react for the first second after boot. */
         while (should_run) {
-            if (R_FAILED(eventWait(&module->event, 10'000'000))) {
-                continue;
+            R_TRY_CATCH(eventWait(&module->event, 10'000'000)) {
+                R_CATCH(kern::ResultWaitTimeout) {
+                    continue;
+                }
             }
+            R_END_TRY_CATCH_WITH_ASSERT;
 
             PscPmState state;
             u32 flags;
-            if (R_SUCCEEDED(pscPmModuleGetRequest(module, &state, &flags))) {
-                switch (state) {
-                    case PscPmState_ReadySleep:
-                        should_pause = true;
-                        while (audout_state == AudioOutState_Started)
-                            ;
-                        break;
-                    default:
-                        break;
-                }
-                pscPmModuleAcknowledge(module, state);
+            R_ABORT_UNLESS(pscPmModuleGetRequest(module, &state, &flags));
+            switch (state) {
+                case PscPmState_ReadySleep:
+                    should_pause = true;
+                    break;
+                default:
+                    break;
             }
+            pscPmModuleAcknowledge(module, state);
         }
     }
 
