@@ -38,8 +38,9 @@ tsl::elm::Element *MainGui::createUI() {
 
     /* Queue. */
     auto *queue_button = new tsl::elm::ListItem("Current Queue");
-    queue_button->setClickListener([](u64 keys) {
+    queue_button->setClickListener([queue_button](u64 keys) {
         if (keys & KEY_A) {
+            queue_button->setFocused(true);
             tsl::changeTo<QueueGui>();
             return true;
         }
@@ -49,8 +50,9 @@ tsl::elm::Element *MainGui::createUI() {
 
     /* Browser. */
     auto *browser_button = new tsl::elm::ListItem("Music browser");
-    browser_button->setClickListener([](u64 keys) {
+    browser_button->setClickListener([browser_button](u64 keys) {
         if (keys & KEY_A) {
+            browser_button->setFocused(true);
             tsl::changeTo<BrowserGui>();
             return true;
         }
