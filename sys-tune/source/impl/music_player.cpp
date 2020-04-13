@@ -417,7 +417,8 @@ namespace ams::tune::impl {
             auto &dst = (mode == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
 
             auto it = std::find(dst.cbegin(), dst.cend(), g_current);
-            g_queue_position = it - dst.cbegin();
+            if (it != dst.cend())
+                g_queue_position = it - dst.cbegin();
         }
 
         g_shuffle = mode;
@@ -508,6 +509,12 @@ namespace ams::tune::impl {
     void Select(u32 index) {
         {
             std::scoped_lock lk(g_mutex);
+
+            if (g_shuffle == ShuffleMode::On) {
+                auto it = std::find(g_shuffle_playlist.cbegin(), g_shuffle_playlist.cend(), g_playlist[index]);
+                if (it != g_shuffle_playlist.cend())
+                    index = it - g_shuffle_playlist.cbegin();
+            }
 
             if (g_queue_position == index)
                 return;
