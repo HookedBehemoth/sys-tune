@@ -23,6 +23,6 @@ dist: all
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/toolbox.json
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
-	zip -r sys-tune-$(VERSION)-$(GITHASH).zip dist
+	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./*; cd ../;
 
 .PHONY: all overlay module
