@@ -359,6 +359,7 @@ namespace ams::tune::impl {
             }
         }
         g_status = PlayerStatus::FetchNext;
+        should_pause = false;
     }
 
     void Prev() {
@@ -372,6 +373,7 @@ namespace ams::tune::impl {
             }
         }
         g_status = PlayerStatus::FetchNext;
+        should_pause = false;
     }
 
     Result GetVolume(float *volume) {
