@@ -3,28 +3,32 @@
 
 #include <switch.h>
 
-class IDirectory {
-    NON_COPYABLE(IDirectory);
+namespace fs {
 
-  private:
-    ::FsDir m_dir;
-    bool open;
+    class IDirectory {
+        NON_COPYABLE(IDirectory);
 
-  public:
-    IDirectory();
-    IDirectory(FsDir &&dir);
-    IDirectory(IDirectory &&dir);
-    IDirectory &operator=(IDirectory &&dir);
-    ~IDirectory();
+      private:
+        ::FsDir m_dir;
+        bool open;
 
-  public:
-    bool IsOpen();
-    void ForceClose();
+      public:
+        IDirectory();
+        IDirectory(FsDir &&dir);
+        IDirectory(IDirectory &&dir);
+        IDirectory &operator=(IDirectory &&dir);
+        ~IDirectory();
 
-  private:
-    void Close();
+      public:
+        bool IsOpen();
+        void ForceClose();
 
-  public:
-    Result Read(s64 *total_entries, FsDirectoryEntry *entries, size_t max_entries);
-    Result GetEntryCount(s64 *count);
-};
+      private:
+        void Close();
+
+      public:
+        Result Read(s64 *total_entries, FsDirectoryEntry *entries, size_t max_entries);
+        Result GetEntryCount(s64 *count);
+    };
+
+}

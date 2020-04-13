@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types/hfs0.hpp"
+#include "types/nca.hpp"
 #include "types/pfs0.hpp"
 #include "util/defines.hpp"
 

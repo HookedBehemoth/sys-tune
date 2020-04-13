@@ -11,6 +11,6 @@ struct StringTable {
         : ptr(data) {}
 
     template <typename Entry>
-    const char *GetName(const Entry &entry) { return ptr + entry.stringTableOffset; }
+    const char *GetName(const Entry &entry) { return ptr + entry.string_table_offset; }
     const char *GetString(size_t offset) { return ptr + offset; }
 };

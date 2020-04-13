@@ -2,25 +2,29 @@
 
 #include "IFileSystem.hpp"
 
-class DirectoryIterator {
-  private:
-    IDirectory *m_dir;
-    FsDirectoryEntry entry;
-    s64 count;
+namespace fs {
 
-  public:
-    DirectoryIterator() = default;
-    DirectoryIterator(IDirectory *dir);
+    class DirectoryIterator {
+      private:
+        IDirectory *m_dir;
+        FsDirectoryEntry entry;
+        s64 count;
 
-    ~DirectoryIterator() = default;
+      public:
+        DirectoryIterator() = default;
+        DirectoryIterator(IDirectory *dir);
 
-    const FsDirectoryEntry &operator*() const;
-    const FsDirectoryEntry *operator->() const;
-    DirectoryIterator &operator++();
+        ~DirectoryIterator() = default;
 
-    bool operator!=(const DirectoryIterator &rhs);
-};
+        const FsDirectoryEntry &operator*() const;
+        const FsDirectoryEntry *operator->() const;
+        DirectoryIterator &operator++();
 
-inline DirectoryIterator begin(DirectoryIterator iter) noexcept { return iter; }
+        bool operator!=(const DirectoryIterator &rhs);
+    };
 
-inline DirectoryIterator end(DirectoryIterator) noexcept { return DirectoryIterator(); }
+    inline DirectoryIterator begin(DirectoryIterator iter) noexcept { return iter; }
+
+    inline DirectoryIterator end(DirectoryIterator) noexcept { return DirectoryIterator(); }
+
+}

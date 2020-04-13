@@ -8,11 +8,19 @@
 
 MAKE_RC(Success, 0, 0)
 
+#ifndef R_TRY
 #define R_TRY(res_expr)                   \
     ({                                    \
         const auto temp_res = (res_expr); \
         if (R_FAILED(temp_res))           \
             return temp_res;              \
+    })
+#endif
+
+#define R_RETURN(res_expr)        \
+    ({                            \
+        if (R_FAILED((res_expr))) \
+            return;               \
     })
 
 #define R_ASSERT(res_expr)                \
