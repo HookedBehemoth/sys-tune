@@ -2,12 +2,12 @@
 
 #include <tesla.hpp>
 
-class QueueGui : public tsl::Gui {
+class PlaylistGui : public tsl::Gui {
   private:
     tsl::elm::List *m_list;
 
   public:
-    QueueGui();
+    PlaylistGui();
 
     virtual tsl::elm::Element *createUI() override;
     virtual void update() override;

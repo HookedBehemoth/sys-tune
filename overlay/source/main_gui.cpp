@@ -1,7 +1,7 @@
 #include "main_gui.hpp"
 
 #include "browser_gui.hpp"
-#include "queue_gui.hpp"
+#include "playlist_gui.hpp"
 
 namespace {
 
@@ -36,11 +36,11 @@ tsl::elm::Element *MainGui::createUI() {
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
 
-    /* Queue. */
-    auto *queue_button = new tsl::elm::ListItem("Current Queue");
+    /* Playlist. */
+    auto *queue_button = new tsl::elm::ListItem("Playlist");
     queue_button->setClickListener([](u64 keys) {
         if (keys & KEY_A) {
-            tsl::changeTo<QueueGui>();
+            tsl::changeTo<PlaylistGui>();
             return true;
         }
         return false;

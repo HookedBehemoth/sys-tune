@@ -65,54 +65,59 @@ void BrowserGui::scanCwd() {
     /* Open directory. */
     IDirectory dir;
     Result rc = this->m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
-    if (R_SUCCEEDED(rc)) {
-        std::vector<tsl::elm::ListItem *> folders, files;
-
-        /* Iternate over directory. */
-        for (const auto &elm : DirectoryIterator(&dir)) {
-            if (elm.type == FsDirEntryType_Dir) {
-                /* Add directory entries. */
-                auto *item = new tsl::elm::ListItem(elm.name);
-                item->setClickListener([this, item](u64 down) -> bool {
-                    if (down & KEY_A) {
-                        std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, item->getText().c_str());
-                        this->scanCwd();
-                        return true;
-                    }
-                    return false;
-                });
-                folders.push_back(item);
-            } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
-                /* Add mp3 entries. */
-                auto *item = new tsl::elm::ListItem(elm.name);
-                item->setClickListener([this, item](u64 down) -> bool {
-                    if (down & KEY_A) {
-                        std::snprintf(path_buffer, FS_MAX_PATH, "%s%s", this->cwd, item->getText().c_str());
-                        tuneEnqueue(path_buffer, TuneEnqueueType_Last);
-                        return true;
-                    }
-                    return false;
-                });
-                files.push_back(item);
-            }
-        }
-        if (folders.size() == 0 && files.size() == 0) {
-            this->m_list->addItem(new tsl::elm::CategoryHeader("Empty..."));
-        }
-
-        if (folders.size() > 0) {
-            std::sort(folders.begin(), folders.end(), ListItemTextCompare);
-            for (auto element : folders)
-                this->m_list->addItem(element);
-        }
-        if (files.size() > 0) {
-            this->m_list->addItem(new tsl::elm::CategoryHeader("Files"));
-            std::sort(files.begin(), files.end(), ListItemTextCompare);
-            for (auto element : files)
-                this->m_list->addItem(element);
-        }
-    } else {
+    if (R_FAILED(rc)) {
+        char result_buffer[0x10];
+        std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
         this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
+        return;
+    }
+
+    std::vector<tsl::elm::ListItem *> folders, files;
+
+    /* Iternate over directory. */
+    for (const auto &elm : DirectoryIterator(&dir)) {
+        if (elm.type == FsDirEntryType_Dir) {
+            /* Add directory entries. */
+            auto *item = new tsl::elm::ListItem(elm.name);
+            item->setClickListener([this, item](u64 down) -> bool {
+                if (down & KEY_A) {
+                    std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, item->getText().c_str());
+                    this->scanCwd();
+                    return true;
+                }
+                return false;
+            });
+            folders.push_back(item);
+        } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
+            /* Add mp3 entries. */
+            auto *item = new tsl::elm::ListItem(elm.name);
+            item->setClickListener([this, item](u64 down) -> bool {
+                if (down & KEY_A) {
+                    std::snprintf(path_buffer, FS_MAX_PATH, "%s%s", this->cwd, item->getText().c_str());
+                    tuneEnqueue(path_buffer, TuneEnqueueType_Last);
+                    return true;
+                }
+                return false;
+            });
+            files.push_back(item);
+        }
+    }
+    if (folders.size() == 0 && files.size() == 0) {
+        this->m_list->addItem(new tsl::elm::CategoryHeader("Empty..."));
+        return;
+    }
+
+    if (folders.size() > 0) {
+        std::sort(folders.begin(), folders.end(), ListItemTextCompare);
+        for (auto element : folders)
+            this->m_list->addItem(element);
+    }
+    if (files.size() > 0) {
+        this->m_list->addItem(new tsl::elm::CategoryHeader("Files"));
+        std::sort(files.begin(), files.end(), ListItemTextCompare);
+        for (auto element : files)
+            this->m_list->addItem(element);
     }
 }
 
