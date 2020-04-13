@@ -21,7 +21,7 @@ class ButtonListItem : public tsl::elm::ListItem {
                 if (currX > this->getLeftBound() && currX < (this->getRightBound() - this->getHeight()) && currY > this->getTopBound() && currY < this->getBottomBound())
                     handled = this->onClick(KEY_A);
 
-                if (currX > (this->getLeftBound() + this->getHeight()) && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound())
+                if (currX > (this->getRightBound() - this->getHeight()) && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound())
                     handled = this->onClick(KEY_Y);
 
                 this->m_clickAnimationProgress = 0;
