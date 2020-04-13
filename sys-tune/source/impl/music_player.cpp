@@ -347,6 +347,7 @@ namespace ams::tune::impl {
     }
 
     void Next() {
+        bool pause = false;
         {
             std::scoped_lock lk(g_mutex);
 
@@ -355,11 +356,11 @@ namespace ams::tune::impl {
             } else {
                 g_queue_position = 0;
                 if (g_repeat == RepeatMode::Off)
-                    should_pause = true;
+                    pause = true;
             }
         }
         g_status = PlayerStatus::FetchNext;
-        should_pause = false;
+        should_pause = pause;
     }
 
     void Prev() {
