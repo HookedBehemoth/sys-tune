@@ -6,7 +6,7 @@
 [subrepo]
 	remote = git@github.com:HookedBehemoth/libtesla.git
 	branch = quality-of-life
-	commit = 77c8121dc9942121580058c5dd7d53087d344ff9
-	parent = 2b08ce044faf2b952bdc2216b7cf4d59e55d65af
+	commit = a73eed1a39b668865394bf3f78a9069bf59323f8
+	parent = 6a7ca5d97e1eaa1e32cf5d3c2adaabe9322200aa
 	method = merge
 	cmdver = 0.4.1
