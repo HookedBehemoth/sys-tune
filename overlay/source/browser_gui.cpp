@@ -19,10 +19,10 @@ BrowserGui::BrowserGui()
     this->m_list = new tsl::elm::List();
 
     /* Open sd card filesystem. */
-    Result rc = fs::OpenSdCardFileSystem(&this->m_fs);
+    Result rc = this->m_fs.OpenSdCardFileSystem();
     if (R_SUCCEEDED(rc)) {
         /* Check if base path /music/ exists. */
-        IDirectory dir;
+        fs::IDirectory dir;
         if (R_SUCCEEDED(this->m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
             std::strcpy(this->cwd, base_path);
             this->has_music = true;
@@ -63,7 +63,7 @@ void BrowserGui::scanCwd() {
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
 
     /* Open directory. */
-    IDirectory dir;
+    fs::IDirectory dir;
     Result rc = this->m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
@@ -76,7 +76,7 @@ void BrowserGui::scanCwd() {
     std::vector<tsl::elm::ListItem *> folders, files;
 
     /* Iternate over directory. */
-    for (const auto &elm : DirectoryIterator(&dir)) {
+    for (const auto &elm : fs::DirectoryIterator(&dir)) {
         if (elm.type == FsDirEntryType_Dir) {
             /* Add directory entries. */
             auto *item = new tsl::elm::ListItem(elm.name);
