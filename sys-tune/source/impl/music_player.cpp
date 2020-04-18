@@ -32,7 +32,7 @@ namespace ams::tune::impl {
         std::vector<std::string> g_shuffle_playlist;
         std::string g_current = "";
         u32 g_queue_position;
-        os::Mutex g_mutex;
+        os::Mutex g_mutex(false);
 
         RepeatMode g_repeat = RepeatMode::All;
         ShuffleMode g_shuffle = ShuffleMode::Off;

@@ -12,7 +12,7 @@ class AlphaSymbol {
     constexpr AlphaSymbol(size_t width, size_t height, const u8 *data)
         : m_width(width), m_height(height), m_data(data) {}
 
-    void draw(s32 x, s32 y, tsl::gfx::Renderer *renderer, tsl::gfx::Color color) const {
+    void draw(s32 x, s32 y, tsl::gfx::Renderer *renderer, tsl::Color color) const {
         const u8 *ptr = this->m_data;
         const s32 x_offset = x - (m_width / 2);
         const s32 y_offset = y - (m_height / 2);

@@ -97,16 +97,16 @@ int main(int argc, char *argv[]) {
     GpioPadSession headphone_detect_session;
     R_ABORT_UNLESS(gpioOpenSession(&headphone_detect_session, GpioPadName(0x15)));
 
-    os::Thread gpioThread;
-    os::Thread pscThread;
-    os::Thread audioThread;
-    R_ABORT_UNLESS(gpioThread.Initialize(tune::impl::GpioThreadFunc, &headphone_detect_session, 0x1000, 0x20));
-    R_ABORT_UNLESS(pscThread.Initialize(tune::impl::PscThreadFunc, &pm_module, 0x1000, 0x20));
-    R_ABORT_UNLESS(audioThread.Initialize(tune::impl::AudioThreadFunc, nullptr, 0x2000, 0x20));
+    ::Thread gpioThread;
+    ::Thread pscThread;
+    ::Thread audioThread;
+    R_ABORT_UNLESS(threadCreate(&gpioThread, tune::impl::GpioThreadFunc, &headphone_detect_session, nullptr, 0x1000, 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&pscThread, tune::impl::PscThreadFunc, &pm_module, nullptr, 0x1000, 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&audioThread, tune::impl::AudioThreadFunc, nullptr, nullptr, 0x2000, 0x20, -2));
 
-    R_ABORT_UNLESS(gpioThread.Start());
-    R_ABORT_UNLESS(pscThread.Start());
-    R_ABORT_UNLESS(audioThread.Start());
+    R_ABORT_UNLESS(threadStart(&gpioThread));
+    R_ABORT_UNLESS(threadStart(&pscThread));
+    R_ABORT_UNLESS(threadStart(&audioThread));
 
     /* Create services */
     R_ABORT_UNLESS(g_server_manager.RegisterServer<tune::ControlService>(MusicServiceName, MusicMaxSessions));
@@ -115,13 +115,13 @@ int main(int argc, char *argv[]) {
 
     tune::impl::Exit();
 
-    R_ABORT_UNLESS(gpioThread.Wait());
-    R_ABORT_UNLESS(pscThread.Wait());
-    R_ABORT_UNLESS(audioThread.Wait());
+    R_ABORT_UNLESS(threadWaitForExit(&gpioThread));
+    R_ABORT_UNLESS(threadWaitForExit(&pscThread));
+    R_ABORT_UNLESS(threadWaitForExit(&audioThread));
 
-    R_ABORT_UNLESS(gpioThread.Join());
-    R_ABORT_UNLESS(pscThread.Join());
-    R_ABORT_UNLESS(audioThread.Join());
+    R_ABORT_UNLESS(threadClose(&gpioThread));
+    R_ABORT_UNLESS(threadClose(&pscThread));
+    R_ABORT_UNLESS(threadClose(&audioThread));
 
     /* Close gpio session. */
     gpioPadClose(&headphone_detect_session);
