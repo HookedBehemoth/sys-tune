@@ -94,22 +94,38 @@ namespace tsl {
 
     }
 
+    /**
+     * @brief RGBA4444 Color structure
+     */
+    struct Color {
+
+        union {
+            struct {
+                u16 r: 4, g: 4, b: 4, a: 4;
+            } PACKED;
+            u16 rgba;
+        };
+
+        constexpr inline Color(u16 raw): rgba(raw) {}
+        constexpr inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
+    };
+
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 70;       ///< Standard list item height
-        constexpr u32 TrackBarDefaultHeight = 90;      ///< Standard track bar height
-        constexpr u8 ListItemHighlightSaturation = 0x6; ///< Maximum saturation of Listitem highlights
-        constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
+        constexpr u32 ListItemDefaultHeight         = 70;       ///< Standard list item height
+        constexpr u32 TrackBarDefaultHeight         = 90;       ///< Standard track bar height
+        constexpr u8  ListItemHighlightSaturation   = 6;        ///< Maximum saturation of Listitem highlights
+        constexpr u8  ListItemHighlightLength       = 22;       ///< Maximum length of Listitem highlights
 
         namespace color {
-            constexpr u16 ColorFrameBackground  = 0xD000;   ///< Overlay frame background color
-            constexpr u16 ColorTransparent      = 0x0000;   ///< Transparent color
-            constexpr u16 ColorHighlight        = 0xFDF0;   ///< Greenish highlight color
-            constexpr u16 ColorFrame            = 0xF777;   ///< Outer boarder color
-            constexpr u16 ColorHandle           = 0xF555;   ///< Track bar handle color
-            constexpr u16 ColorText             = 0xFFFF;   ///< Standard text color
-            constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
-            constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
-            constexpr u16 ColorClickAnimation   = 0xF220;
+            constexpr Color ColorFrameBackground  = { 0x0, 0x0, 0x0, 0xD };   ///< Overlay frame background color
+            constexpr Color ColorTransparent      = { 0x0, 0x0, 0x0, 0x0 };   ///< Transparent color
+            constexpr Color ColorHighlight        = { 0x0, 0xF, 0xD, 0xF };   ///< Greenish highlight color
+            constexpr Color ColorFrame            = { 0x7, 0x7, 0x7, 0xF };   ///< Outer boarder color
+            constexpr Color ColorHandle           = { 0x5, 0x5, 0x5, 0xF };   ///< Track bar handle color
+            constexpr Color ColorText             = { 0xF, 0xF, 0xF, 0xF };   ///< Standard text color
+            constexpr Color ColorDescription      = { 0xA, 0xA, 0xA, 0xF };   ///< Description text color
+            constexpr Color ColorHeaderBar        = { 0xC, 0xC, 0xC, 0xF };   ///< Category header rectangle color
+            constexpr Color ColorClickAnimation   = { 0x0, 0x2, 0x2, 0xF };   ///< Element click animation color
         }
     }
 
@@ -238,9 +254,9 @@ namespace tsl {
          */
         static Result captureScreen() {
             /* Allocate buffer for jpeg. */
-            size_t buffer_size = 0x7D000;
-            u8 *buffer = new u8[buffer_size];
-            ScopeGuard buffer_guard([buffer] { delete[] buffer; });
+            size_t bufferSize = 0x7D000;
+            u8 *buffer = new u8[bufferSize];
+            ScopeGuard bufferGuard([buffer] { delete[] buffer; });
 
             /* Capture current screen. */
             u64 size;
@@ -248,29 +264,29 @@ namespace tsl {
                 u32 a;
                 u64 b;
             } in = {0, 10000000000};
+
             R_TRY(serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
-                .buffer_attrs = {SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out},
-                .buffers = { { buffer, buffer_size } },
+                .buffer_attrs = { SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+                .buffers = { { buffer, bufferSize } },
             ));
 
             /* Open Sd card filesystem. */
             FsFileSystem sdmc;
             R_TRY(fsOpenSdCardFileSystem(&sdmc));
-            ScopeGuard sdmc_guard([&sdmc] { fsFsClose(&sdmc); });
+            ScopeGuard sdmcGuard([&sdmc] { fsFsClose(&sdmc); });
 
             /* Allocate path buffer. */
             char *pathBuffer = new char[FS_MAX_PATH];
-            ScopeGuard path_guard([pathBuffer] { delete[] pathBuffer; });
+            ScopeGuard pathGuard([pathBuffer] { delete[] pathBuffer; });
 
             /* Get unique filepath. */
-            u64 timestamp=0;
-            Result rc = timeGetCurrentTime(TimeType_Default, &timestamp);
-            if (R_SUCCEEDED(rc)) std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
-            else std::strcpy(pathBuffer, "/libtesla_screenshot.jpg");
+            u64 timestamp = svcGetSystemTick();
+            std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
 
             /* Create file, open and write to it. */
             fsFsDeleteFile(&sdmc, pathBuffer);
             R_TRY(fsFsCreateFile(&sdmc, pathBuffer, size, 0));
+
             FsFile file;
             R_TRY(fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file));
             fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
@@ -527,22 +543,6 @@ namespace tsl {
     namespace gfx {
 
         extern "C" u64 __nx_vi_layer_id;
-
-        /**
-         * @brief RGBA4444 Color structure
-         */
-        struct Color {
-
-            union {
-                struct {
-                    u16 r: 4, g: 4, b: 4, a: 4;
-                } PACKED;
-                u16 rgba;
-            };
-
-            inline Color(u16 raw): rgba(raw) {}
-            inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
-        };
 
         struct ScissoringConfig {
             s32 x, y, w, h;
@@ -1317,7 +1317,7 @@ namespace tsl {
              * @param renderer Renderer
              */
             virtual void drawClickAnimation(gfx::Renderer *renderer) {
-                gfx::Color animColor = tsl::style::color::ColorClickAnimation;
+                Color animColor = tsl::style::color::ColorClickAnimation;
                 u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
 
                 animColor.g = saturation;
@@ -1350,7 +1350,7 @@ namespace tsl {
             virtual void drawHighlight(gfx::Renderer *renderer) {
                 static float counter = 0;
                 const float progress = (std::sin(counter) + 1) / 2;
-                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
                                                 static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0xC - 0xF) * progress + 0xF), 
                                                 0xF };
@@ -1768,7 +1768,7 @@ namespace tsl {
              * 
              * @param color Color of the rectangle
              */
-            DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
+            DebugRectangle(Color color) : Element(), m_color(color) {}
             virtual ~DebugRectangle() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
@@ -1778,7 +1778,7 @@ namespace tsl {
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
 
         private:
-            gfx::Color m_color;
+            Color m_color;
         };
 
 
@@ -1922,7 +1922,7 @@ namespace tsl {
              * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, ssize_t index = -1, u16 height = 0) final {
+            virtual void addItem(Element *element, u16 height = 0, ssize_t index = -1) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -2140,7 +2140,7 @@ namespace tsl {
                         auto [width, height] = renderer->drawString(this->m_scrollText.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
                         this->m_scrollText += this->m_text;
                         this->m_textWidth = width;
-                        this->m_ellipsisText = renderer->limitStringLength(this->m_text, false, 23, this->m_maxWidth);
+                        this->m_ellipsisText = renderer->limitStringLength(this->m_text, false, 22, this->m_maxWidth);
                     } else {
                         this->m_textWidth = width;
                     }
@@ -2492,7 +2492,7 @@ namespace tsl {
             virtual void drawHighlight(gfx::Renderer *renderer) override {
                 static float counter = 0;
                 const float progress = (std::sin(counter) + 1) / 2;
-                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
                                                 static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0xC - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0x6 - 0xD) * progress + 0xD) };
@@ -3677,13 +3677,12 @@ extern "C" {
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(capsscInitialize());
-            ASSERT_FATAL(timeInitialize());
             ASSERT_FATAL(fsInitialize());
-            ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
-            ASSERT_FATAL(plInitialize());       // Font data
-            ASSERT_FATAL(pmdmntInitialize());   // PID querying
-            ASSERT_FATAL(hidsysInitialize());   // Focus control
-            ASSERT_FATAL(setsysInitialize());   // Settings querying
+            ASSERT_FATAL(hidInitialize());                          // Controller inputs and Touch
+            ASSERT_FATAL(plInitialize(PlServiceType_System));       // Font data. Use pl:s to prevent qlaunch/overlaydisp session exhaustion
+            ASSERT_FATAL(pmdmntInitialize());                       // PID querying
+            ASSERT_FATAL(hidsysInitialize());                       // Focus control
+            ASSERT_FATAL(setsysInitialize());                       // Settings querying
         });
     }
 
@@ -3693,7 +3692,6 @@ extern "C" {
      */
     void __appExit(void) {
         capsscExit();
-        timeExit();
         fsExit();
         hidExit();
         plExit();
