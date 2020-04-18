@@ -260,7 +260,7 @@ namespace ams::tune::impl {
                             mpg123_desc = "UNKNOWN";
                         fprintf(file, "mpg error: %s\n", mpg123_desc);
                     } else {
-                        fprintf(file, "other error: 0x%x, 2%03X-%04X\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
+                        fprintf(file, "other error: 0x%x, 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
                         u32 count;
                         u64 sample_count;
                         if (R_SUCCEEDED(audoutGetAudioOutBufferCount(&count)))
