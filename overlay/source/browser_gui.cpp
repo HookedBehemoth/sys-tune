@@ -1,12 +1,11 @@
 #include "browser_gui.hpp"
 
 #include "../../ipc/tune.h"
-
 #include "list_items.hpp"
 
 namespace {
 
-    bool ListItemTextCompare(const tsl::elm::ListItem *_lhs, const tsl::elm::ListItem *_rhs){
+    bool ListItemTextCompare(const tsl::elm::ListItem *_lhs, const tsl::elm::ListItem *_rhs) {
         return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
     };
 }
@@ -82,7 +81,10 @@ void BrowserGui::scanCwd() {
             auto *item = new tsl::elm::ListItem(elm.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
                     std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, item->getText().c_str());
+#pragma GCC diagnostic pop
                     this->scanCwd();
                     return true;
                 }
