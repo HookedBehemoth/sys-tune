@@ -8,11 +8,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Update repo.
-      run: |
-        sed -i 's/git@github.com:/git:\/\/github.com\//' .gitmodules
-        git submodule update --init --recursive
-        
     - name: Install devkitpro
       run: |
         wget https://github.com/devkitPro/pacman/releases/download/devkitpro-pacman-1.0.1/devkitpro-pacman.deb
