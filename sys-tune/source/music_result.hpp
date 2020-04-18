@@ -23,6 +23,7 @@ namespace ams::kern {
     R_DEFINE_NAMESPACE_RESULT_MODULE(1);
 
     R_DEFINE_ERROR_RESULT(WaitTimeout, 117);
+    R_DEFINE_ERROR_RESULT(OperationCanceled, 118);
 
 }
 

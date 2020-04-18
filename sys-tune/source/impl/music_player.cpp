@@ -282,11 +282,13 @@ namespace ams::tune::impl {
     void PscThreadFunc(void *ptr) {
         PscPmModule *module = static_cast<PscPmModule *>(ptr);
 
-        /* Don't react for the first second after boot. */
         while (should_run) {
-            R_TRY_CATCH(eventWait(&module->event, 10'000'000)) {
+            R_TRY_CATCH(eventWait(&module->event, UINT64_MAX)) {
                 R_CATCH(kern::ResultWaitTimeout) {
                     continue;
+                }
+                R_CATCH(kern::ResultOperationCanceled) {
+                    break;
                 }
             }
             R_END_TRY_CATCH_WITH_ASSERT;
@@ -313,7 +315,6 @@ namespace ams::tune::impl {
         /* [0] Low == plugged in; [1] High == not plugged in. */
         GpioValue old_value = GpioValue_High;
 
-        /* Don't react for the first second after boot. */
         while (should_run) {
             /* Fetch current gpio value. */
             GpioValue value;

@@ -51,9 +51,15 @@ void __libnx_initheap(void) {
 }
 
 void __appInit() {
-    hos::SetVersionForLibnx();
-
     sm::DoWithSession([] {
+        R_ABORT_UNLESS(setsysInitialize());
+        {
+            SetSysFirmwareVersion version;
+            R_ABORT_UNLESS(setsysGetFirmwareVersion(&version));
+            hosversionSet(MAKEHOSVERSION(version.major, version.minor, version.micro));
+            setsysExit();
+        }
+
         R_ABORT_UNLESS(gpioInitialize());
         R_ABORT_UNLESS(pscmInitialize());
         R_ABORT_UNLESS(audoutInitialize());
@@ -114,6 +120,8 @@ int main(int argc, char *argv[]) {
     g_server_manager.LoopProcess();
 
     tune::impl::Exit();
+    svcCancelSynchronization(gpioThread.handle);
+    svcCancelSynchronization(pscThread.handle);
 
     R_ABORT_UNLESS(threadWaitForExit(&gpioThread));
     R_ABORT_UNLESS(threadWaitForExit(&pscThread));
@@ -212,6 +220,8 @@ int main(int argc, char *argv[]) {
     }
 
     tune::impl::Exit();
+    svcCancelSynchronization(gpioThread.handle);
+    svcCancelSynchronization(pscThread.handle);
 
     R_ABORT_UNLESS(gpioThread.Wait());
     R_ABORT_UNLESS(audioThread.Wait());
