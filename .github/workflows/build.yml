@@ -1,0 +1,43 @@
+name: Build sys-tune and overlay
+
+on: [push]
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Update repo.
+      run: |
+        sed -i 's/git@github.com:/git:\/\/github.com\//' .gitmodules
+        git submodule update --init --recursive
+        
+    - name: Install devkitpro
+      run: |
+        wget https://github.com/devkitPro/pacman/releases/download/devkitpro-pacman-1.0.1/devkitpro-pacman.deb
+        sudo dpkg -i devkitpro-pacman.deb
+        sudo dkp-pacman -S $(dkp-pacman -Ssq switch-*) --noconfirm
+
+    - name: Build and install libnx master
+      run: |
+        source /etc/profile.d/devkit-env.sh
+        git clone https://github.com/switchbrew/libnx.git
+        sed -i 's/ lib\/libnxd\.a//g' libnx/nx/Makefile
+        make -C libnx -j$(nproc)
+        sudo -E make -C libnx install
+        
+    - name: Building Atmosphere-libs
+      run: |
+        source /etc/profile.d/devkit-env.sh
+        make -j$(nproc) -C sys-tune/Atmosphere-libs
+        
+    - name: Building sys-tune
+      run: |
+        source /etc/profile.d/devkit-env.sh
+        make -j$(nproc) -C sys-tune
+        
+    - name: Building overlay
+      run: |
+        source /etc/profile.d/devkit-env.sh
+        make -j$(nproc) -C overlay
