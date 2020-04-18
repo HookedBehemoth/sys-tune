@@ -39,6 +39,7 @@ namespace ams::boot2 {
             ncm::SystemProgramId::NvServices,  /* nvservices */
             ncm::SystemProgramId::NvnFlinger,  /* nvnflinger */
             ncm::SystemProgramId::Vi,          /* vi */
+            ncm::SystemProgramId::Pgl,         /* pgl */
             ncm::SystemProgramId::Ns,          /* ns */
             ncm::SystemProgramId::LogManager,  /* lm */
             ncm::SystemProgramId::Ppc,         /* ppc */
@@ -84,6 +85,7 @@ namespace ams::boot2 {
             ncm::SystemProgramId::NvServices,  /* nvservices */
             ncm::SystemProgramId::NvnFlinger,  /* nvnflinger */
             ncm::SystemProgramId::Vi,          /* vi */
+            ncm::SystemProgramId::Pgl,         /* pgl */
             ncm::SystemProgramId::Ns,          /* ns */
             ncm::SystemProgramId::LogManager,  /* lm */
             ncm::SystemProgramId::Ppc,         /* ppc */
@@ -133,19 +135,29 @@ namespace ams::boot2 {
             return c == '\r' || c == '\n';
         }
 
+        inline bool IsAllowedLaunchProgram(const ncm::ProgramLocation &loc) {
+            if (loc.program_id == ncm::SystemProgramId::Pgl) {
+                return hos::GetVersion() >= hos::Version_10_0_0;
+            }
+            return true;
+        }
+
         void LaunchProgram(os::ProcessId *out_process_id, const ncm::ProgramLocation &loc, u32 launch_flags) {
             os::ProcessId process_id = os::InvalidProcessId;
 
-            /* Launch, lightly validate result. */
-            {
-                const auto launch_result = pm::shell::LaunchProgram(&process_id, loc, launch_flags);
-                AMS_ABORT_UNLESS(!(svc::ResultOutOfResource::Includes(launch_result)));
-                AMS_ABORT_UNLESS(!(svc::ResultOutOfMemory::Includes(launch_result)));
-                AMS_ABORT_UNLESS(!(svc::ResultLimitReached::Includes(launch_result)));
-            }
+            /* Only launch the process if we're allowed to. */
+            if (IsAllowedLaunchProgram(loc)) {
+                /* Launch, lightly validate result. */
+                {
+                    const auto launch_result = pm::shell::LaunchProgram(&process_id, loc, launch_flags);
+                    AMS_ABORT_UNLESS(!(svc::ResultOutOfResource::Includes(launch_result)));
+                    AMS_ABORT_UNLESS(!(svc::ResultOutOfMemory::Includes(launch_result)));
+                    AMS_ABORT_UNLESS(!(svc::ResultLimitReached::Includes(launch_result)));
+                }
 
-            if (out_process_id) {
-                *out_process_id = process_id;
+                if (out_process_id) {
+                    *out_process_id = process_id;
+                }
             }
         }
 
@@ -308,7 +320,7 @@ namespace ams::boot2 {
 
         /* Wait for other atmosphere mitm modules to initialize. */
         R_ABORT_UNLESS(sm::mitm::WaitMitm(sm::ServiceName::Encode("set:sys")));
-        if (hos::GetVersion() >= hos::Version_200) {
+        if (hos::GetVersion() >= hos::Version_2_0_0) {
             R_ABORT_UNLESS(sm::mitm::WaitMitm(sm::ServiceName::Encode("bpc")));
         } else {
             R_ABORT_UNLESS(sm::mitm::WaitMitm(sm::ServiceName::Encode("bpc:c")));
@@ -337,7 +349,7 @@ namespace ams::boot2 {
         if (maintenance) {
             LaunchList(AdditionalMaintenanceLaunchPrograms, NumAdditionalMaintenanceLaunchPrograms);
             /* Starting in 7.0.0, npns is launched during maintenance boot. */
-            if (hos::GetVersion() >= hos::Version_700) {
+            if (hos::GetVersion() >= hos::Version_7_0_0) {
                 LaunchProgram(nullptr, ncm::ProgramLocation::Make(ncm::SystemProgramId::Npns, ncm::StorageId::BuiltInSystem), 0);
             }
         } else {

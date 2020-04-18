@@ -23,6 +23,12 @@
 namespace ams::pm::shell {
 
     /* Shell API. */
-    Result LaunchProgram(os::ProcessId *out_process_id, const ncm::ProgramLocation &loc, u32 launch_flags);
+    Result LaunchProgram(os::ProcessId *out, const ncm::ProgramLocation &loc, u32 launch_flags);
+    Result TerminateProcess(os::ProcessId process_id);
+    Result GetProcessEventEvent(os::SystemEvent *out);
+    Result GetProcessEventInfo(ProcessEventInfo *out);
+    Result GetApplicationProcessIdForShell(os::ProcessId *out);
+    Result BoostSystemMemoryResourceLimit(u64 size);
+    Result EnableApplicationExtraThread();
 
 }

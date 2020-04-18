@@ -95,6 +95,7 @@ namespace ams::ncm {
         static const SystemProgramId Dt;
         static const SystemProgramId Nd;
         static const SystemProgramId Ngct;
+        static const SystemProgramId Pgl;
 
         static const SystemProgramId End;
     };
@@ -192,6 +193,7 @@ namespace ams::ncm {
     inline constexpr const SystemProgramId SystemProgramId::Dt          = { 0x010000000000003Ful };
     inline constexpr const SystemProgramId SystemProgramId::Nd          = { 0x0100000000000040ul };
     inline constexpr const SystemProgramId SystemProgramId::Ngct        = { 0x0100000000000041ul };
+    inline constexpr const SystemProgramId SystemProgramId::Pgl         = { 0x0100000000000042ul };
 
     inline constexpr const SystemProgramId SystemProgramId::End   = { 0x01000000000007FFul };
 
@@ -397,6 +399,34 @@ namespace ams::ncm {
     }
 
     inline constexpr bool IsSystemAppletId(const SystemAppletId &program_id) {
+        return true;
+    }
+
+    struct SystemDebugAppletId {
+        u64 value;
+
+        constexpr operator ProgramId() const {
+            return { this->value };
+        }
+
+        static const SystemDebugAppletId Start;
+
+        static const SystemDebugAppletId SnapShotDumper;
+
+        static const SystemDebugAppletId End;
+    };
+
+    inline constexpr const SystemDebugAppletId SystemDebugAppletId::Start           = { 0x0100000000002000ul };
+
+    inline constexpr const SystemDebugAppletId SystemDebugAppletId::SnapShotDumper  = { 0x0100000000002071ul };
+
+    inline constexpr const SystemDebugAppletId SystemDebugAppletId::End             = { 0x0100000000002FFFul };
+
+    inline constexpr bool IsSystemDebugAppletId(const ProgramId &program_id) {
+        return SystemDebugAppletId::Start <= program_id && program_id <= SystemDebugAppletId::End;
+    }
+
+    inline constexpr bool IsSystemDebugAppletId(const SystemDebugAppletId &program_id) {
         return true;
     }
 

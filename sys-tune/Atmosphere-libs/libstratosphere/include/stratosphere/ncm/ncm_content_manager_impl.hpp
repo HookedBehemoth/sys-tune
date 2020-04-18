@@ -30,14 +30,32 @@
 
 namespace ams::ncm {
 
-    class ContentMetaMemoryResource {
+    class ContentMetaMemoryResource : public MemoryResource {
         private:
             mem::StandardAllocator allocator;
-            sf::StandardAllocatorMemoryResource memory_resource;
+            size_t peak_total_alloc_size;
+            size_t peak_alloc_size;
         public:
-            ContentMetaMemoryResource(void *heap, size_t heap_size) : allocator(heap, heap_size), memory_resource(std::addressof(allocator)) { /* ... */ }
+            explicit ContentMetaMemoryResource(void *heap, size_t heap_size) : allocator(heap, heap_size) { /* ... */ }
 
-            MemoryResource *Get() { return std::addressof(this->memory_resource); }
+            mem::StandardAllocator *GetAllocator() { return std::addressof(this->allocator); }
+            size_t GetPeakTotalAllocationSize() const { return this->peak_total_alloc_size; }
+            size_t GetPeakAllocationSize() const { return this->peak_alloc_size; }
+        private:
+            virtual void *AllocateImpl(size_t size, size_t alignment) override {
+                void *mem = this->allocator.Allocate(size, alignment);
+                this->peak_total_alloc_size = std::max(this->allocator.Hash().allocated_size, this->peak_total_alloc_size);
+                this->peak_alloc_size = std::max(size, this->peak_alloc_size);
+                return mem;
+            }
+
+            virtual void DeallocateImpl(void *buffer, size_t size, size_t alignment) override {
+                return this->allocator.Free(buffer);
+            }
+
+            virtual bool IsEqualImpl(const MemoryResource &resource) const override {
+                return this == std::addressof(resource);
+            }
     };
 
     struct SystemSaveDataInfo {
@@ -83,7 +101,7 @@ namespace ams::ncm {
                 ContentMetaDatabaseRoot() { /* ... */ }
             };
         private:
-            os::RecursiveMutex mutex;
+            os::Mutex mutex;
             bool initialized;
             ContentStorageRoot content_storage_roots[MaxContentStorageRoots];
             ContentMetaDatabaseRoot content_meta_database_roots[MaxContentMetaDatabaseRoots];
@@ -91,7 +109,7 @@ namespace ams::ncm {
             u32 num_content_meta_entries;
             RightsIdCache rights_id_cache;
         public:
-            ContentManagerImpl() : initialized(false) { /* ... */ };
+            ContentManagerImpl() : mutex(true), initialized(false) { /* ... */ };
             ~ContentManagerImpl();
         public:
             Result Initialize(const ContentManagerConfig &config);
@@ -127,6 +145,7 @@ namespace ams::ncm {
             virtual Result ActivateContentMetaDatabase(StorageId storage_id) override;
             virtual Result InactivateContentMetaDatabase(StorageId storage_id) override;
             virtual Result InvalidateRightsIdCache() override;
+            virtual Result GetMemoryReport(sf::Out<MemoryReport> out) override;
     };
 
 }

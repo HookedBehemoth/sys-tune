@@ -27,7 +27,7 @@ namespace ams::fssystem {
                 uintptr_t address;
                 size_t size;
             public:
-                constexpr AdditionalDeviceAddressEntry() : mutex(), is_registered(), address(), size() { /* ... */ }
+                constexpr AdditionalDeviceAddressEntry() : mutex(false), is_registered(), address(), size() { /* ... */ }
 
                 void Register(uintptr_t addr, size_t sz) {
                     std::scoped_lock lk(this->mutex);
@@ -78,7 +78,7 @@ namespace ams::fssystem {
         constexpr size_t HeapAllocatableSizeMaxForLarge = HeapBlockSize * (static_cast<size_t>(1) << HeapOrderMaxForLarge);
 
         /* TODO: SdkMutex */
-        os::Mutex g_heap_mutex;
+        os::Mutex g_heap_mutex(false);
         FileSystemBuddyHeap g_heap;
 
         std::atomic<size_t> g_retry_count;
@@ -169,7 +169,7 @@ namespace ams::fssystem {
         if (this->size > ideal_size) {
             /* If we do, we need to have a buffer allocated from the heap. */
             AMS_ASSERT(this->buffer != nullptr);
-            AMS_ASSERT(g_heap.GetBlockSize(), HeapBlockSize);
+            AMS_ASSERT(g_heap.GetBlockSize() == HeapBlockSize);
 
             const size_t new_size = util::AlignUp(ideal_size, HeapBlockSize);
 
