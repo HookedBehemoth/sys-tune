@@ -30,9 +30,9 @@ jobs:
     - name: Building sys-tune
       run: |
         source /etc/profile.d/devkit-env.sh
-        make -j$(nproc) -C sys-tune
+        API_VERSION=9 make -j$(nproc) -C sys-tune
         
     - name: Building overlay
       run: |
         source /etc/profile.d/devkit-env.sh
-        make -j$(nproc) -C overlay
+        API_VERSION=9 make -j$(nproc) -C overlay
