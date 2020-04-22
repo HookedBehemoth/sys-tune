@@ -4,16 +4,19 @@
 
 namespace ams::tune {
 
-    Result ControlService::GetStatus(sf::Out<AudioOutState> out) {
-        return impl::GetStatus(out.GetPointer());
+    Result ControlService::GetStatus(sf::Out<bool> out) {
+        out.SetValue(impl::GetStatus());
+        return ResultSuccess();
     }
 
     Result ControlService::Play() {
-        return impl::Play();
+        impl::Play();
+        return ResultSuccess();
     }
 
     Result ControlService::Pause() {
-        return impl::Pause();
+        impl::Pause();
+        return ResultSuccess();
     }
 
     Result ControlService::Next() {
@@ -27,15 +30,17 @@ namespace ams::tune {
     }
 
     Result ControlService::GetVolume(sf::Out<float> out) {
-        return impl::GetVolume(out.GetPointer());
+        out.SetValue(impl::GetVolume());
+        return ResultSuccess();
     }
 
     Result ControlService::SetVolume(float volume) {
-        return impl::SetVolume(volume);
+        impl::SetVolume(volume);
+        return ResultSuccess();
     }
 
     Result ControlService::GetRepeatMode(sf::Out<RepeatMode> mode) {
-        impl::GetRepeatMode(mode.GetPointer());
+        mode.SetValue(impl::GetRepeatMode());
         return ResultSuccess();
     }
 
@@ -45,7 +50,7 @@ namespace ams::tune {
     }
 
     Result ControlService::GetShuffleMode(sf::Out<ShuffleMode> mode) {
-        impl::GetShuffleMode(mode.GetPointer());
+        mode.SetValue(impl::GetShuffleMode());
         return ResultSuccess();
     }
 
@@ -55,12 +60,12 @@ namespace ams::tune {
     }
 
     Result ControlService::GetCurrentPlaylistSize(sf::Out<u32> size) {
-        impl::GetCurrentPlaylistSize(size.GetPointer());
+        size.SetValue(impl::GetCurrentPlaylistSize());
         return ResultSuccess();
     }
 
     Result ControlService::GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
-        impl::GetCurrentPlaylist(size.GetPointer(), (char*)buffer.GetPointer(), buffer.GetSize());
+        size.SetValue(impl::GetCurrentPlaylist((char*)buffer.GetPointer(), buffer.GetSize()));
         return ResultSuccess();
     }
 

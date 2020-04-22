@@ -7,7 +7,7 @@
 
 class StatusBar : public tsl::elm::Element {
   private:
-    AudioOutState m_state;
+    bool m_playing;
     TuneRepeatMode m_repeat;
     TuneShuffleMode m_shuffle;
     std::string_view m_current_track;
@@ -33,7 +33,7 @@ class StatusBar : public tsl::elm::Element {
     virtual bool onClick(u64 keys) override;
     virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override;
 
-    void update(AudioOutState state, const char *current_track, double percentage);
+    void update(bool playing, const char *current_track, double percentage);
     void CycleRepeat();
     void CyclePlay();
     void CycleShuffle();

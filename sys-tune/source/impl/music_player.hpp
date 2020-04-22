@@ -2,6 +2,16 @@
 
 #include "../types.hpp"
 
+/* Default audio config. */
+constexpr const AudioRendererConfig audren_cfg = {
+    .output_rate = AudioRendererOutputRate_48kHz,
+    .num_voices = 4,
+    .num_effects = 0,
+    .num_sinks = 1,
+    .num_mix_objs = 1,
+    .num_mix_buffers = 2,
+};
+
 namespace ams::tune::impl {
 
     Result Initialize();
@@ -11,22 +21,22 @@ namespace ams::tune::impl {
     void PscThreadFunc(void *ptr);
     void GpioThreadFunc(void *ptr);
 
-    Result GetStatus(AudioOutState *out);
-    Result Play();
-    Result Pause();
+    bool GetStatus();
+    void Play();
+    void Pause();
     void Next();
     void Prev();
 
-    Result GetVolume(float *volume);
-    Result SetVolume(float volume);
+    float GetVolume();
+    void SetVolume(float volume);
 
-    void GetRepeatMode(RepeatMode *mode);
+    RepeatMode GetRepeatMode();
     void SetRepeatMode(RepeatMode mode);
-    void GetShuffleMode(ShuffleMode *mode);
+    ShuffleMode GetShuffleMode();
     void SetShuffleMode(ShuffleMode mode);
 
-    void GetCurrentPlaylistSize(u32 *size);
-    void GetCurrentPlaylist(u32 *size, char* buffer, size_t buffer_size);
+    u32 GetCurrentPlaylistSize();
+    u32 GetCurrentPlaylist(char* buffer, size_t buffer_size);
     Result GetCurrentQueueItem(CurrentStats *out, char* buffer, size_t buffer_size);
     void ClearQueue();
     void MoveQueueItem(u32 src, u32 dst);

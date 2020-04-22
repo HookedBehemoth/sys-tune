@@ -5,7 +5,7 @@
 #define REPEAT_X
 
 StatusBar::StatusBar(const char *current_track, const char *progress_text, const char *total_text)
-    : m_state(), m_current_track(current_track), m_progress_text(progress_text), m_total_text(total_text), m_percentage(0.0), m_text_width(-1), m_truncated(false), m_scroll_offset(0), m_counter(0) {
+    : m_playing(), m_current_track(current_track), m_progress_text(progress_text), m_total_text(total_text), m_percentage(0.0), m_text_width(-1), m_truncated(false), m_scroll_offset(0), m_counter(0) {
     if (R_FAILED(tuneGetRepeatMode(&this->m_repeat)))
         this->m_repeat = TuneRepeatMode_Off;
     if (R_FAILED(tuneGetShuffleMode(&this->m_shuffle)))
@@ -160,8 +160,8 @@ bool StatusBar::onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 pr
     return false;
 }
 
-void StatusBar::update(AudioOutState state, const char *current_track, double percentage) {
-    this->m_state = state;
+void StatusBar::update(bool playing, const char *current_track, double percentage) {
+    this->m_playing = playing;
     if (current_track == nullptr) {
         this->m_current_track = "Not playing anything.";
         this->m_text_width = 0;
@@ -187,10 +187,10 @@ void StatusBar::CycleShuffle() {
 }
 
 void StatusBar::CyclePlay() {
-    if (this->m_state == AudioOutState_Stopped) {
-        tunePlay();
-    } else {
+    if (this->m_playing) {
         tunePause();
+    } else {
+        tunePlay();
     }
 }
 
@@ -203,12 +203,5 @@ void StatusBar::Next() {
 }
 
 const AlphaSymbol &StatusBar::GetPlaybackSymbol() {
-    switch (this->m_state) {
-        case AudioOutState_Started:
-            return symbol::pause::symbol;
-        case AudioOutState_Stopped:
-            return symbol::play::symbol;
-        default:
-            return symbol::stop::symbol;
-    }
+    return this->m_playing ? symbol::pause::symbol : symbol::play::symbol;
 }

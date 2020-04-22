@@ -35,7 +35,7 @@ namespace ams::tune {
         };
 
       public:
-        virtual Result GetStatus(sf::Out<AudioOutState> out);
+        virtual Result GetStatus(sf::Out<bool> out);
         virtual Result Play();
         virtual Result Pause();
         virtual Result Next();
@@ -60,7 +60,7 @@ namespace ams::tune {
         virtual Result Remove(u32 index);
 
         virtual Result GetApiVersion(sf::Out<u32> version) {
-            version.SetValue(0);
+            version.SetValue(TUNE_API_VERSION);
             return ResultSuccess();
         }
 

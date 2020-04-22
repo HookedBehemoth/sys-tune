@@ -14,6 +14,17 @@ namespace {
         tuneSetVolume(music_volume);
     }
 
+    void NullLastDot(char *str) {
+        char *end = str + strlen(str) - 1;
+        while (str != end) {
+            if (*end == '.') {
+                *end = '\0';
+                return;
+            }
+            end--;
+        }
+    }
+
 }
 
 MainGui::MainGui() : m_progress_text(" 0:00"), m_total_text(" 0:00") {
@@ -66,37 +77,39 @@ tsl::elm::Element *MainGui::createUI() {
     return frame;
 }
 
-#define MIN(val) (int)val / 60
-#define SEC(val) (int)val % 60
+#define MIN(val) val / 60
+#define SEC(val) val % 60
 
 void MainGui::update() {
     static u8 counter = 0;
     if ((counter % 15) == 0) {
-        AudioOutState status = AudioOutState_Stopped;
-        tuneGetStatus(&status);
+        bool playing = false;
+        if (R_FAILED(tuneGetStatus(&playing)))
+            playing = false;
+
         TuneCurrentStats stats;
         if (R_SUCCEEDED(tuneGetCurrentQueueItem(path_buffer, FS_MAX_PATH, &stats))) {
             /* Progress text and bar */
-            double total = stats.tpf * stats.total_frame_count;
-            double progress = stats.tpf * stats.progress_frame_count;
+            u32 total = stats.total_frames / stats.sample_rate;
+            u32 progress = stats.current_frame / stats.sample_rate;
             std::snprintf(this->m_progress_text, 0x10, "%2d:%02d", MIN(progress), SEC(progress));
             std::snprintf(this->m_total_text, 0x10, "%2d:%02d", MIN(total), SEC(total));
-            double percentage = progress / total;
+            double percentage = double(stats.current_frame) / double(stats.total_frames);
             /* Only show file name. Ignore path to file and extension. */
             size_t length = std::strlen(path_buffer);
-            path_buffer[length - 4] = '\0';
+            NullLastDot(path_buffer);
             for (size_t i = length; i >= 0; i--) {
                 if (path_buffer[i] == '/') {
-                    this->m_status_bar->update(status, path_buffer + i + 1, percentage);
+                    this->m_status_bar->update(playing, path_buffer + i + 1, percentage);
                     counter = 1;
                     return;
                 }
             }
-            this->m_status_bar->update(status, path_buffer, percentage);
+            this->m_status_bar->update(playing, path_buffer, percentage);
         } else {
             std::strcpy(this->m_progress_text, "00:00");
             std::strcpy(this->m_total_text, "00:00");
-            this->m_status_bar->update(status, nullptr, 0);
+            this->m_status_bar->update(playing, nullptr, 0);
         }
         counter = 0;
     }
