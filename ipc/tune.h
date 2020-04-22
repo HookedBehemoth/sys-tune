@@ -100,6 +100,7 @@ Result tuneGetCurrentQueueItem(char *out_path, size_t out_path_length, TuneCurre
 Result tuneClearQueue();
 Result tuneMoveQueueItem(u32 src, u32 dst);
 Result tuneSelect(u32 index);
+Result tuneSeek(u32 position);
 
 /**
  * @brief Add track to queue.

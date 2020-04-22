@@ -88,6 +88,11 @@ namespace ams::tune {
         return ResultSuccess();
     }
 
+    Result ControlService::Seek(u32 position) {
+        impl::Seek(position);
+        return ResultSuccess();
+    }
+
     Result ControlService::Enqueue(sf::InBuffer buffer, EnqueueType type) {
         return impl::Enqueue((char*)buffer.GetPointer(), buffer.GetSize(), type);
     }

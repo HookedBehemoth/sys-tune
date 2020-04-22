@@ -441,6 +441,11 @@ namespace ams::tune::impl {
         should_pause = false;
     }
 
+    void Seek(u32 position) {
+        if (g_source != nullptr && g_source->IsOpen())
+            g_source->Seek(position);
+    }
+
     Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
         /* Ensure file exists. */
         static ams::fs::FileTimeStampRaw timestamp;

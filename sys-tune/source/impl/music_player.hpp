@@ -41,6 +41,7 @@ namespace ams::tune::impl {
     void ClearQueue();
     void MoveQueueItem(u32 src, u32 dst);
     void Select(u32 index);
+    void Seek(u32 position);
 
     Result Enqueue(const char* buffer, size_t buffer_length, EnqueueType type);
     Result Remove(u32 index);

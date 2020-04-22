@@ -115,6 +115,10 @@ Result tuneSelect(u32 index) {
     return serviceDispatchIn(&g_tune, 35, index);
 }
 
+Result tuneSeek(u32 position) {
+    return serviceDispatchIn(&g_tune, 36, position);
+}
+
 Result tuneEnqueue(const char *path, TuneEnqueueType type) {
     u8 tmp = type;
     size_t path_length = strlen(path);

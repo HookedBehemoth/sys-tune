@@ -27,6 +27,7 @@ namespace ams::tune {
             ClearQueue = 33,
             MoveQueueItem = 34,
             Select = 35,
+            Seek = 36,
 
             Enqueue = 40,
             Remove = 41,
@@ -55,6 +56,7 @@ namespace ams::tune {
         virtual Result ClearQueue();
         virtual Result MoveQueueItem(u32 src, u32 dst);
         virtual Result Select(u32 index);
+        virtual Result Seek(u32 position);
 
         virtual Result Enqueue(sf::InBuffer buffer, EnqueueType type);
         virtual Result Remove(u32 index);
@@ -86,6 +88,7 @@ namespace ams::tune {
             MAKE_SERVICE_COMMAND_META(ClearQueue),
             MAKE_SERVICE_COMMAND_META(MoveQueueItem),
             MAKE_SERVICE_COMMAND_META(Select),
+            MAKE_SERVICE_COMMAND_META(Seek),
 
             MAKE_SERVICE_COMMAND_META(Enqueue),
             MAKE_SERVICE_COMMAND_META(Remove),
