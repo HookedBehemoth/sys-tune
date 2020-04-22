@@ -12,7 +12,7 @@ class StatusBar : public tsl::elm::Element {
     TuneShuffleMode m_shuffle;
     TuneCurrentStats m_stats;
 
-    double m_percentage;
+    float m_percentage;
 
     std::string_view m_current_track;
     std::string m_scroll_text;

@@ -235,7 +235,7 @@ void StatusBar::update() {
     /* Progress text and bar */
     u32 current = this->m_stats.current_frame / this->m_stats.sample_rate;
     u32 total = this->m_stats.total_frames / this->m_stats.sample_rate;
-    this->m_percentage = double(this->m_stats.current_frame) / double(this->m_stats.total_frames);
+    this->m_percentage = std::clamp(float(this->m_stats.current_frame) / float(this->m_stats.total_frames), 0.0f, 1.0f);
 
     std::snprintf(current_buffer, sizeof(current_buffer), "%d:%02d", current / 60, current % 60);
     std::snprintf(total_buffer, sizeof(total_buffer), "%d:%02d", total / 60, total % 60);
