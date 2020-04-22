@@ -3,8 +3,7 @@
 #---------------------------------------------------------------------------------
 include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))/Atmosphere-libs/config/templates/stratosphere.mk
 
-export LIBS		+=	-lmpg123
-export DEFINES	+=	-DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE
+export DEFINES	+=	-DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE -DWANT_FLAC -DWANT_MP3 -DWANT_WAV
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
@@ -104,7 +103,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-all	:	$(OUTPUT).nsp# $(OUTPUT).nro
+all	:	$(OUTPUT).nsp $(OUTPUT).nro
 
 $(OUTPUT).nsp	:	$(OUTPUT).elf
 

@@ -27,8 +27,11 @@ void tuneExit() {
     serviceClose(&g_tune);
 }
 
-Result tuneGetStatus(AudioOutState *status) {
-    return serviceDispatchOut(&g_tune, 0, *status);
+Result tuneGetStatus(bool *status) {
+    u8 tmp=0;
+    Result rc = serviceDispatchOut(&g_tune, 0, tmp);
+    if (R_SUCCEEDED(rc) && status) *status = tmp & 1;
+    return rc;
 }
 
 Result tunePlay() {
@@ -110,6 +113,10 @@ Result tuneMoveQueueItem(u32 src, u32 dst) {
 
 Result tuneSelect(u32 index) {
     return serviceDispatchIn(&g_tune, 35, index);
+}
+
+Result tuneSeek(u32 position) {
+    return serviceDispatchIn(&g_tune, 36, position);
 }
 
 Result tuneEnqueue(const char *path, TuneEnqueueType type) {

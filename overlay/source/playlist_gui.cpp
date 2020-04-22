@@ -9,6 +9,17 @@ namespace {
     constexpr const size_t queue_size = 30 * FS_MAX_PATH;
     char queue_buffer[queue_size];
 
+    void NullLastDot(char *str) {
+        char *end = str + strlen(str) - 1;
+        while (str != end) {
+            if (*end == '.') {
+                *end = '\0';
+                return;
+            }
+            end--;
+        }
+    }
+
 }
 
 PlaylistGui::PlaylistGui() {
@@ -33,7 +44,7 @@ PlaylistGui::PlaylistGui() {
     for (u32 i = 0; i < std::min(count, queue_count); i++) {
         const char *str = ptr;
         size_t length = std::strlen(ptr);
-        ptr[length - 4] = '\0';
+        NullLastDot(ptr);
         for (size_t i = length; i >= 0; i--) {
             if (ptr[i] == '/') {
                 str = ptr + i + 1;
