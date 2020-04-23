@@ -7607,12 +7607,12 @@ static void drflac__init_from_info(drflac* pFlac, const drflac_init_info* pInit)
 
 static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac_seek_proc onSeek, drflac_meta_proc onMeta, drflac_container container, void* pUserData, void* pUserDataMD, const drflac_allocation_callbacks* pAllocationCallbacks)
 {
-    drflac_init_info init;
+    static drflac_init_info init;
     drflac_uint32 allocationSize;
     drflac_uint32 wholeSIMDVectorCountPerChannel;
     drflac_uint32 decodedSamplesAllocationSize;
 #ifndef DR_FLAC_NO_OGG
-    drflac_oggbs oggbs;
+    static drflac_oggbs oggbs;
 #endif
     drflac_uint64 firstFramePos;
     drflac_uint64 seektablePos;

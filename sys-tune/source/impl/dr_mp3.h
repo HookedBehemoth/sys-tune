@@ -2186,7 +2186,7 @@ DRMP3_API int drmp3dec_decode_frame(drmp3dec *dec, const unsigned char *mp3, int
     int i = 0, igr, frame_size = 0, success = 1;
     const drmp3_uint8 *hdr;
     drmp3_bs bs_frame[1];
-    drmp3dec_scratch scratch;
+    static drmp3dec_scratch scratch;
 
     if (mp3_bytes > 4 && dec->header[0] == 0xff && drmp3_hdr_compare(dec->header, mp3))
     {

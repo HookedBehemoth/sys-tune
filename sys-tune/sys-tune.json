@@ -3,7 +3,7 @@
     "title_id":    "0x4200000000000000",
     "title_id_range_min":    "0x4200000000000000",
     "title_id_range_max":    "0x4200000000000000",
-    "main_thread_stack_size":    "0x00004000",
+    "main_thread_stack_size":    "0x00002000",
     "main_thread_priority":    48,
     "default_cpu_id":    3,
     "process_category":    0,

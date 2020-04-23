@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     R_ABORT_UNLESS(tune::impl::Initialize());
 
     /* Register audio as our dependency so we can pause before it prepares for sleep. */
-    u16 dependencies[] = {PscPmModuleId_Audio};
+    constexpr const u16 dependencies[] = {PscPmModuleId_Audio};
 
     /* Get pm module to listen for state change. */
     PscPmModule pm_module;
