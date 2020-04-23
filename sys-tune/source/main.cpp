@@ -9,7 +9,7 @@ extern u32 __start__;
 u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 
-#define INNER_HEAP_SIZE 0x40000
+#define INNER_HEAP_SIZE 0x60000
 size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 char nx_inner_heap[INNER_HEAP_SIZE];
 
@@ -261,7 +261,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (kDown & KEY_DDOWN) {
-            const char *path = "sdmc:/music/test.ogg";
+            /* Just a _really_ long compressed sample. Don't judge me please. */
+            const char *path = "sdmc:/music/misc/Dj CUTMAN - The Legend of Dubstep.mp3";
             ams::tune::impl::Enqueue(path, std::strlen(path), ams::tune::EnqueueType::Next);
             ams::tune::impl::Play();
         }

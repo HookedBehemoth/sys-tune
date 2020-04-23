@@ -86,7 +86,6 @@ namespace ams::tune::impl {
                     int nSamples = source->Decode(sample_count, data);
 
                     if (nSamples == 0 && source->Done()) {
-                        LOG("finished playback!");
                         if (g_repeat != RepeatMode::One)
                             Next();
                         break;
