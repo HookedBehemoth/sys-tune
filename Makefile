@@ -1,5 +1,5 @@
 export GITHASH := $(shell git rev-parse --short HEAD)
-export VERSION := 1.1.0-beta
+export VERSION := 1.1.1-beta
 export API_VERSION := 1
 
 all: overlay module
