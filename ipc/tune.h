@@ -23,9 +23,9 @@ typedef enum {
 } TuneEnqueueType;
 
 typedef struct {
-    double tpf;
-    double total_frame_count;
-    double progress_frame_count;
+    u32 sample_rate;
+    u32 current_frame;
+    u32 total_frames;
 } TuneCurrentStats;
 
 Result tuneInitialize();
@@ -36,7 +36,7 @@ void tuneExit();
  * @brief Get the current status of playback.
  * @param[out] status \ref AudioOutState
  */
-Result tuneGetStatus(AudioOutState *status);
+Result tuneGetStatus(bool *status);
 
 Result tunePlay();
 Result tunePause();
@@ -100,6 +100,7 @@ Result tuneGetCurrentQueueItem(char *out_path, size_t out_path_length, TuneCurre
 Result tuneClearQueue();
 Result tuneMoveQueueItem(u32 src, u32 dst);
 Result tuneSelect(u32 index);
+Result tuneSeek(u32 position);
 
 /**
  * @brief Add track to queue.

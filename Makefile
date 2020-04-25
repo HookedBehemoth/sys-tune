@@ -1,6 +1,6 @@
 export GITHASH := $(shell git rev-parse --short HEAD)
-export VERSION := 1.0.0
-export API_VERSION := 0
+export VERSION := 1.1.1-beta
+export API_VERSION := 1
 
 all: overlay module
 
@@ -15,6 +15,7 @@ overlay:
 
 module:
 	$(MAKE) -C sys-tune
+	hactool -t nso sys-tune/sys-tune.nso
 
 dist: all
 	mkdir -p dist/switch/.overlays

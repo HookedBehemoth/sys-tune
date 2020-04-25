@@ -7,8 +7,6 @@
 
 class MainGui : public tsl::Gui {
   private:
-    char m_progress_text[0x10];
-    char m_total_text[0x10];
     StatusBar *m_status_bar;
     tsl::elm::TrackBar *m_volume_slider;
 

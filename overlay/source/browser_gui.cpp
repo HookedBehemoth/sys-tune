@@ -8,6 +8,11 @@ namespace {
     bool ListItemTextCompare(const tsl::elm::ListItem *_lhs, const tsl::elm::ListItem *_rhs) {
         return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
     };
+
+    ALWAYS_INLINE bool EndsWith(const char* name, const char *ext) {
+        return strcasecmp(name + std::strlen(name) - std::strlen(ext), ext) == 0;
+    }
+
 }
 constexpr const char *const base_path = "/music/";
 
@@ -91,12 +96,15 @@ void BrowserGui::scanCwd() {
                 return false;
             });
             folders.push_back(item);
-        } else if (strcasecmp(elm.name + std::strlen(elm.name) - 4, ".mp3") == 0) {
-            /* Add mp3 entries. */
+        } else if (EndsWith(elm.name, ".mp3") || EndsWith(elm.name, ".wav") || EndsWith(elm.name, ".wave") || EndsWith(elm.name, ".flac")) {
+            /* Add file entry. */
             auto *item = new tsl::elm::ListItem(elm.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
-                    std::snprintf(path_buffer, FS_MAX_PATH, "%s%s", this->cwd, item->getText().c_str());
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+                    std::snprintf(path_buffer, FS_MAX_PATH, "sdmc:%s%s", this->cwd, item->getText().c_str());
+#pragma GCC diagnostic pop
                     tuneEnqueue(path_buffer, TuneEnqueueType_Last);
                     return true;
                 }

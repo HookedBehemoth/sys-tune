@@ -5,7 +5,6 @@
 
 namespace {
 
-    char path_buffer[FS_MAX_PATH] = "";
     constexpr const size_t num_steps = 20;
     constexpr const float max_volume = 2;
 
@@ -16,8 +15,8 @@ namespace {
 
 }
 
-MainGui::MainGui() : m_progress_text(" 0:00"), m_total_text(" 0:00") {
-    m_status_bar = new StatusBar(path_buffer, this->m_progress_text, this->m_total_text);
+MainGui::MainGui() {
+    m_status_bar = new StatusBar();
     m_volume_slider = new tsl::elm::StepTrackBar("\uE13C", num_steps);
     /* Get initial volume. */
     float volume = 0;
@@ -66,39 +65,10 @@ tsl::elm::Element *MainGui::createUI() {
     return frame;
 }
 
-#define MIN(val) (int)val / 60
-#define SEC(val) (int)val % 60
-
 void MainGui::update() {
-    static u8 counter = 0;
-    if ((counter % 15) == 0) {
-        AudioOutState status = AudioOutState_Stopped;
-        tuneGetStatus(&status);
-        TuneCurrentStats stats;
-        if (R_SUCCEEDED(tuneGetCurrentQueueItem(path_buffer, FS_MAX_PATH, &stats))) {
-            /* Progress text and bar */
-            double total = stats.tpf * stats.total_frame_count;
-            double progress = stats.tpf * stats.progress_frame_count;
-            std::snprintf(this->m_progress_text, 0x10, "%2d:%02d", MIN(progress), SEC(progress));
-            std::snprintf(this->m_total_text, 0x10, "%2d:%02d", MIN(total), SEC(total));
-            double percentage = progress / total;
-            /* Only show file name. Ignore path to file and extension. */
-            size_t length = std::strlen(path_buffer);
-            path_buffer[length - 4] = '\0';
-            for (size_t i = length; i >= 0; i--) {
-                if (path_buffer[i] == '/') {
-                    this->m_status_bar->update(status, path_buffer + i + 1, percentage);
-                    counter = 1;
-                    return;
-                }
-            }
-            this->m_status_bar->update(status, path_buffer, percentage);
-        } else {
-            std::strcpy(this->m_progress_text, "00:00");
-            std::strcpy(this->m_total_text, "00:00");
-            this->m_status_bar->update(status, nullptr, 0);
-        }
-        counter = 0;
-    }
-    counter++;
+    static u8 tick = 0;
+    /* Update status 4 times per second. */
+    if ((tick % 15) == 0)
+        this->m_status_bar->update();
+    tick++;
 }

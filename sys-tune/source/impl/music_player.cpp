@@ -2,27 +2,12 @@
 
 #include "../music_result.hpp"
 
-#include <atomic>
 #include <list>
-#include <malloc.h>
-#include <mpg123.h>
-#include <numeric>
-#include <random>
-#include <regex>
 #include <string>
 
-#define MPG_TRY(res_expr)                                 \
-    ({                                                    \
-        const auto res = (res_expr);                      \
-        if (AMS_UNLIKELY(res != MPG123_OK)) {             \
-            if (res == MPG123_DONE) {                     \
-                return ResultMpgDone();                   \
-            } else {                                      \
-                mpg123_desc = mpg123_plain_strerror(res); \
-                return ResultMpgFailure();                \
-            }                                             \
-        }                                                 \
-    })
+#include "source.hpp"
+
+Source *g_source = nullptr;
 
 namespace ams::tune::impl {
 
@@ -36,156 +21,86 @@ namespace ams::tune::impl {
 
         RepeatMode g_repeat = RepeatMode::All;
         ShuffleMode g_shuffle = ShuffleMode::Off;
-        PlayerStatus g_status = PlayerStatus::Playing;
+        PlayerStatus g_status = PlayerStatus::FetchNext;
 
-        AudioOutState audout_state = AudioOutState_Stopped;
+        AudioDriver g_drv;
+        u8 *audMemPool = nullptr;
+        constexpr const int MinSampleCount = 256;
+        constexpr const int MaxChannelCount = 8;
+        constexpr const int BufferCount = 2;
+        constexpr const int AudioSampleSize = MinSampleCount * MaxChannelCount * sizeof(s16);
 
         bool should_pause = false;
         bool should_run = true;
-        const char *mpg123_desc;
-
-        double g_tpf;
-        off_t g_total_frame_count;
-
-        mpg123_handle *music_handle = nullptr;
-
-        Result AppendBuffer(AudioOutBuffer *buffer) {
-            /* Read decoded audio. */
-            size_t data_size;
-            MPG_TRY(mpg123_read(music_handle, (u8 *)buffer->buffer, buffer->buffer_size, &data_size));
-            buffer->data_size = data_size;
-            armDCacheFlush(buffer->buffer, data_size);
-
-            /* Append the decoded audio buffer. */
-            return audoutAppendAudioOutBuffer(buffer);
-        };
-
-        Result PauseImpl() {
-            R_SUCCEED_IF(audout_state == AudioOutState_Stopped);
-            /* Wait for all buffers to finish playing. */
-            u32 count;
-            while (R_SUCCEEDED(audoutGetAudioOutBufferCount(&count)) && count > 0) {
-                LOG("There are: %d buffers remaining\n", count);
-                AudioOutBuffer *released;
-                R_TRY(audoutWaitPlayFinish(&released, &count, UINT64_MAX));
-            }
-            /* Stop audio playback. */
-            R_TRY(audoutStopAudioOut());
-            audout_state = AudioOutState_Stopped;
-            return ResultSuccess();
-        }
-
-        Result PlayImpl() {
-            R_SUCCEED_IF(audout_state == AudioOutState_Started);
-            R_TRY(audoutStartAudioOut());
-            audout_state = AudioOutState_Started;
-            return ResultSuccess();
-        }
-
-        Result SilentPauseImpl() {
-            float prev_volume;
-            R_TRY(GetVolume(&prev_volume));
-            R_TRY(SetVolume(0));
-            R_TRY(PlayImpl());
-            R_TRY(PauseImpl());
-            R_TRY(SetVolume(prev_volume));
-            return ResultSuccess();
-        }
 
         Result PlayTrack(const std::string &path) {
-            R_TRY(SilentPauseImpl());
-            ON_SCOPE_EXIT {
-                SilentPauseImpl();
-            };
+            /* Open file and allocate */
+            Source *source = OpenFile(path.c_str());
+            R_UNLESS(source != nullptr, ResultFileOpenFailure());
 
-            /* Open file. */
-            MPG_TRY(mpg123_open(music_handle, path.c_str()));
-            ON_SCOPE_EXIT { mpg123_close(music_handle); };
+            ON_SCOPE_EXIT { delete source; };
+            R_UNLESS(source->IsOpen(), ResultFileOpenFailure());
 
-            /* Fix format to prevent variation during playback. */
-            long rate;
-            int channels, encoding;
-            MPG_TRY(mpg123_getformat(music_handle, &rate, &channels, &encoding));
-            MPG_TRY(mpg123_format_none(music_handle));
-            MPG_TRY(mpg123_format(music_handle, rate, channels, encoding));
+            R_UNLESS(audrvVoiceInit(&g_drv, 0, source->GetChannelCount(), PcmFormat_Int16, source->GetSampleRate()), ResultAudrvVoiceInitFailure());
+            ON_SCOPE_EXIT { audrvVoiceDrop(&g_drv, 0); };
 
-            /* Get length of frame in seconds. */
-            double tpf = mpg123_tpf(music_handle);
-            R_UNLESS(tpf >= 0, ResultMpgFailure());
+            audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
 
-            /* Get length of track in frames. */
-            off_t frame_count = mpg123_framelength(music_handle);
-            R_UNLESS(frame_count != MPG123_ERR, ResultMpgFailure());
+            int channel_count = source->GetChannelCount();
 
-            LOG("predicted length: %lf seconds\n", tpf * frame_count);
-
-            g_total_frame_count = frame_count;
-            g_tpf = tpf;
-            /* Reset frame information on exit. */
-            ON_SCOPE_EXIT {
-                g_tpf = 0;
-                g_total_frame_count = 0;
-            };
-
-            size_t data_size = mpg123_outblock(music_handle);
-            size_t buffer_size = (data_size + 0xfff) & ~0xfff; // Align to 0x1000 bytes
-
-            constexpr const size_t reserved_mem = 0x8000;
-            u16 buffer_count = reserved_mem / buffer_size;
-
-            R_UNLESS(buffer_count > 0, ResultBlockSizeTooBig());
-
-            /* IAudioOut supports up to 32 buffers at the same time. */
-            if (buffer_count > 0x20)
-                buffer_count = 0x20;
-
-            ScopedOutBuffer buffers[buffer_count];
-            for (auto &buffer : buffers) {
-                R_UNLESS(buffer.init(buffer_size), MAKERESULT(Module_Libnx, LibnxError_OutOfMemory));
-                LOG("Buffer address: 0x%p\n", &buffer.buffer);
+            for (int src = 0; src < channel_count; src++) {
+                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, src, src % 2);
             }
+            audrvVoiceStart(&g_drv, 0);
+
+            const s32 sample_count = AudioSampleSize / channel_count / sizeof(s16);
+            AudioDriverWaveBuf buffers[2] = {};
+
+            for (int i = 0; i < 2; i++) {
+                buffers[i].data_pcm16 = (s16 *)audMemPool;
+                buffers[i].size = AudioSampleSize;
+                buffers[i].start_sample_offset = i * sample_count;
+                buffers[i].end_sample_offset = buffers[i].start_sample_offset + sample_count;
+            }
+
+            g_source = source;
+            ON_SCOPE_EXIT { g_source = nullptr; };
 
             while (should_run && g_status == PlayerStatus::Playing) {
                 if (should_pause) {
-                    R_TRY(PauseImpl());
-                } else {
-                    R_TRY(PlayImpl());
+                    svcSleepThread(17'000'000);
+                    continue;
                 }
 
-                /* Check if all buffers are still queued. */
-                u32 count;
-                R_TRY(audoutGetAudioOutBufferCount(&count));
-                if (count != buffer_count) {
-                    /* Append buffers that aren't queued. */
-                    for (auto &buffer : buffers) {
-                        bool appended;
-                        if (R_SUCCEEDED(audoutContainsAudioOutBuffer(&buffer.buffer, &appended)) && !appended) {
-                            AppendBuffer(&buffer.buffer);
-                        }
-                        LOG("buffer: 0x%p: appended: %s\n", &buffer.buffer, appended ? "true" : "false");
+                AudioDriverWaveBuf *refillBuf = nullptr;
+                for (auto &buffer : buffers) {
+                    if (buffer.state == AudioDriverWaveBufState_Free || buffer.state == AudioDriverWaveBufState_Done) {
+                        refillBuf = &buffer;
+                        break;
                     }
                 }
 
-                /* Wait buffers to finish playing and append those again. */
-                AudioOutBuffer *released = nullptr;
-                u32 release_count;
-                if (R_SUCCEEDED(audoutWaitPlayFinish(&released, &release_count, 100'000'000))) {
-                    if (release_count == 1) {
-                        /* Append released audio buffer. */
-                        R_TRY_CATCH(AppendBuffer(released)) {
-                            R_CATCH(ResultMpgDone) {
-                                if (g_repeat != RepeatMode::One)
-                                    Next();
+                if (refillBuf) {
+                    s16 *data = (s16 *)audMemPool + refillBuf->start_sample_offset * 2;
 
-                                break;
-                            }
-                        }
-                        R_END_TRY_CATCH;
+                    int nSamples = source->Decode(sample_count, data);
+
+                    if (nSamples == 0 && source->Done()) {
+                        if (g_repeat != RepeatMode::One)
+                            Next();
+                        break;
                     }
+
+                    armDCacheFlush(data, nSamples * 2 * sizeof(u16));
+                    refillBuf->end_sample_offset = refillBuf->start_sample_offset + nSamples;
+
+                    audrvVoiceAddWaveBuf(&g_drv, 0, refillBuf);
+                    audrvVoiceStart(&g_drv, 0);
                 }
+
+                audrvUpdate(&g_drv);
+                audrenWaitFrame();
             }
-
-            PauseImpl();
 
             return ResultSuccess();
         }
@@ -193,18 +108,33 @@ namespace ams::tune::impl {
     }
 
     Result Initialize() {
-        should_run = true;
-        g_status = PlayerStatus::FetchNext;
+        /* Create audio driver. */
+        R_TRY(audrvCreate(&g_drv, &audren_cfg, 2));
+        auto audrv_guard = SCOPE_GUARD { audrvClose(&g_drv); };
 
-        MPG_TRY(mpg123_init());
-        int err;
-        music_handle = mpg123_new(nullptr, &err);
-        MPG_TRY(err);
+        /* Align memory pool size. */
+        const int poolSize = (AudioSampleSize * BufferCount + (AUDREN_MEMPOOL_ALIGNMENT - 1)) & ~(AUDREN_MEMPOOL_ALIGNMENT - 1);
 
-        /* Set parameters. */
-        MPG_TRY(mpg123_param(music_handle, MPG123_FORCE_RATE, audoutGetSampleRate(), 0));
-        MPG_TRY(mpg123_param(music_handle, MPG123_ADD_FLAGS, MPG123_FORCE_STEREO, 0));
-        MPG_TRY(mpg123_volume(music_handle, 0.4));
+        /* Allocate memory aligned. */
+        audMemPool = new (std::align_val_t(AUDREN_MEMPOOL_ALIGNMENT), std::nothrow) u8[poolSize];
+        if (audMemPool == nullptr)
+            return ResultOutOfMemory();
+        auto buffer_guard = SCOPE_GUARD { delete[] audMemPool; };
+
+        /* Register memory pool. */
+        int mpid = audrvMemPoolAdd(&g_drv, audMemPool, poolSize);
+        audrvMemPoolAttach(&g_drv, mpid);
+
+        /* Attach default sink. */
+        constexpr const u8 sink_channels[] = {0, 1};
+        audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
+        R_TRY(audrvUpdate(&g_drv));
+
+        R_TRY(audrenStartAudioRenderer());
+
+        /* Dismiss our safety guards as everything succeeded. */
+        buffer_guard.Cancel();
+        audrv_guard.Cancel();
 
         return ResultSuccess();
     }
@@ -253,30 +183,13 @@ namespace ams::tune::impl {
                 Remove(g_queue_position);
                 if (shuffle)
                     SetShuffleMode(ShuffleMode::On);
-                FILE *file = fopen("sdmc:/music.log", "a");
-                if (AMS_LIKELY(file)) {
-                    if (rc.GetValue() == ResultMpgFailure().GetValue()) {
-                        if (!mpg123_desc)
-                            mpg123_desc = "UNKNOWN";
-                        fprintf(file, "mpg error: %s\n", mpg123_desc);
-                    } else {
-                        fprintf(file, "other error: 0x%x, 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
-                        u32 count;
-                        u64 sample_count;
-                        if (R_SUCCEEDED(audoutGetAudioOutBufferCount(&count)))
-                            fprintf(file, "buffer count: %d\n", count);
-                        if (R_SUCCEEDED(audoutGetAudioOutPlayedSampleCount(&sample_count)))
-                            fprintf(file, "played sample count: %ld\n", sample_count);
 
-                        SilentPauseImpl();
-                    }
-                    fclose(file);
-                }
+                LOG("error: 0x%x, 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
             }
         }
 
-        mpg123_delete(music_handle);
-        mpg123_exit();
+        delete[] audMemPool;
+        audrvClose(&g_drv);
     }
 
     void PscThreadFunc(void *ptr) {
@@ -310,7 +223,7 @@ namespace ams::tune::impl {
     void GpioThreadFunc(void *ptr) {
         GpioPadSession *session = static_cast<GpioPadSession *>(ptr);
 
-        AudioOutState pre_unplug_state = AudioOutState_Stopped;
+        bool pre_unplug_pause = false;
 
         /* [0] Low == plugged in; [1] High == not plugged in. */
         GpioValue old_value = GpioValue_High;
@@ -320,12 +233,11 @@ namespace ams::tune::impl {
             GpioValue value;
             if (R_SUCCEEDED(gpioPadGetValue(session, &value))) {
                 if (old_value == GpioValue_Low && value == GpioValue_High) {
-                    if (R_SUCCEEDED(audoutGetAudioOutState(&pre_unplug_state)))
-                        if (pre_unplug_state == AudioOutState_Started)
-                            Pause();
+                    pre_unplug_pause = should_pause;
+                    should_pause = true;
                 } else if (old_value == GpioValue_High && value == GpioValue_Low) {
-                    if (pre_unplug_state == AudioOutState_Started)
-                        Play();
+                    if (!pre_unplug_pause)
+                        should_pause = false;
                 }
                 old_value = value;
             }
@@ -333,18 +245,16 @@ namespace ams::tune::impl {
         }
     }
 
-    Result GetStatus(AudioOutState *out) {
-        return audoutGetAudioOutState(out);
+    bool GetStatus() {
+        return !should_pause;
     }
 
-    Result Play() {
+    void Play() {
         should_pause = false;
-        return ResultSuccess();
     }
 
-    Result Pause() {
+    void Pause() {
         should_pause = true;
-        return ResultSuccess();
     }
 
     void Next() {
@@ -378,44 +288,24 @@ namespace ams::tune::impl {
         should_pause = false;
     }
 
-    Result GetVolume(float *volume) {
-        if (hosversionBefore(6, 0, 0)) {
-            double base, real, rva;
-            if (mpg123_getvolume(music_handle, &base, &real, &rva) != MPG123_OK)
-                return ResultMpgFailure();
-            *volume = real * 2;
-            return ResultSuccess();
-        }
-
-        return audoutGetAudioOutVolume(volume);
+    float GetVolume() {
+        return g_drv.in_mixes[0].volume;
     }
 
-    Result SetVolume(float volume) {
-        /* Volume in range? */
-        if (volume < 0) {
-            volume = 0;
-        } else if (volume > 2) {
-            volume = 2;
-        }
-
-        if (hosversionBefore(6, 0, 0)) {
-            if (mpg123_volume(music_handle, volume / 2) != MPG123_OK)
-                return ResultMpgFailure();
-            return ResultSuccess();
-        }
-        return audoutSetAudioOutVolume(volume);
+    void SetVolume(float volume) {
+        g_drv.in_mixes[0].volume = volume;
     }
 
-    void GetRepeatMode(RepeatMode *mode) {
-        *mode = g_repeat;
+    RepeatMode GetRepeatMode() {
+        return g_repeat;
     }
 
     void SetRepeatMode(RepeatMode mode) {
         g_repeat = mode;
     }
 
-    void GetShuffleMode(ShuffleMode *mode) {
-        *mode = g_shuffle;
+    ShuffleMode GetShuffleMode() {
+        return g_shuffle;
     }
 
     void SetShuffleMode(ShuffleMode mode) {
@@ -432,13 +322,13 @@ namespace ams::tune::impl {
         g_shuffle = mode;
     }
 
-    void GetCurrentPlaylistSize(u32 *size) {
+    u32 GetCurrentPlaylistSize() {
         std::scoped_lock lk(g_mutex);
 
-        *size = g_playlist.size();
+        return g_playlist.size();
     }
 
-    void GetCurrentPlaylist(u32 *size, char *buffer, size_t buffer_size) {
+    u32 GetCurrentPlaylist(char *buffer, size_t buffer_size) {
         std::scoped_lock lk(g_mutex);
 
         u32 tmp = 0;
@@ -450,10 +340,13 @@ namespace ams::tune::impl {
             remaining--;
             tmp++;
         }
-        *size = tmp;
+        return tmp;
     }
 
     Result GetCurrentQueueItem(CurrentStats *out, char *buffer, size_t buffer_size) {
+        R_UNLESS(g_source != nullptr, ResultNotPlaying());
+        R_UNLESS(g_source->IsOpen(), ResultNotPlaying());
+
         {
             std::scoped_lock lk(g_mutex);
             R_UNLESS(!g_current.empty(), ResultNotPlaying());
@@ -461,12 +354,12 @@ namespace ams::tune::impl {
             std::strcpy(buffer, g_current.c_str());
         }
 
-        double progress_frame_count = mpg123_tellframe(music_handle);
-        R_UNLESS(progress_frame_count != MPG123_ERR, ResultMpgFailure());
+        auto [current, total] = g_source->Tell();
+        int sample_rate = g_source->GetSampleRate();
 
-        out->tpf = g_tpf;
-        out->total_frame_count = g_total_frame_count;
-        out->progress_frame_count = progress_frame_count;
+        out->sample_rate = sample_rate;
+        out->current_frame = current;
+        out->total_frames = total;
 
         return ResultSuccess();
     }
@@ -547,14 +440,15 @@ namespace ams::tune::impl {
         should_pause = false;
     }
 
-    Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
-        /* Maps a mp3 file? */
-        R_UNLESS(strcasecmp(buffer + buffer_length - 4, ".mp3") == 0, ResultInvalidPath());
+    void Seek(u32 position) {
+        if (g_source != nullptr && g_source->IsOpen())
+            g_source->Seek(position);
+    }
 
-        /* Ensure file exists and can be opened. */
-        FILE *f = fopen(buffer, "rb");
-        R_UNLESS(f, ResultFileNotFound());
-        fclose(f);
+    Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
+        /* Ensure file exists. */
+        static ams::fs::FileTimeStampRaw timestamp;
+        R_TRY(fs::GetFileTimeStampRaw(&timestamp, buffer));
 
         std::scoped_lock lk(g_mutex);
 

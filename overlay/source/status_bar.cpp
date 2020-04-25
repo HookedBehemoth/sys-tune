@@ -2,14 +2,35 @@
 
 #include "symbol.hpp"
 
-#define REPEAT_X
+namespace {
 
-StatusBar::StatusBar(const char *current_track, const char *progress_text, const char *total_text)
-    : m_state(), m_current_track(current_track), m_progress_text(progress_text), m_total_text(total_text), m_percentage(0.0), m_text_width(-1), m_truncated(false), m_scroll_offset(0), m_counter(0) {
+    char path_buffer[FS_MAX_PATH] = "";
+    char current_buffer[0x20] = "";
+    char total_buffer[0x20] = "";
+
+    void NullLastDot(char *str) {
+        char *end = str + strlen(str) - 1;
+        while (str != end) {
+            if (*end == '.') {
+                *end = '\0';
+                return;
+            }
+            end--;
+        }
+    }
+
+}
+
+StatusBar::StatusBar()
+    : m_playing(false), m_percentage(0.0), m_text_width(), m_truncated(false), m_scroll_offset(0), m_counter(0) {
     if (R_FAILED(tuneGetRepeatMode(&this->m_repeat)))
         this->m_repeat = TuneRepeatMode_Off;
     if (R_FAILED(tuneGetShuffleMode(&this->m_shuffle)))
         this->m_shuffle = TuneShuffleMode_Off;
+    if (R_FAILED(tuneGetCurrentQueueItem(path_buffer, FS_MAX_PATH, &this->m_stats))) {
+        path_buffer[0] = '\0';
+        this->m_stats = {};
+    }
 }
 
 tsl::elm::Element *StatusBar::requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) {
@@ -57,12 +78,14 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     u32 bar_length = this->getWidth() - 30;
     renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight, bar_length, 3, 0xffff);
 
-    renderer->drawCircle(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
-    renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight - 2, bar_length * this->m_percentage, 7, 0xf00f);
-    renderer->drawCircle(this->getX() + 15 + bar_length * this->m_percentage, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
+    if (this->m_percentage > 0) {
+        renderer->drawCircle(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
+        renderer->drawRect(this->getX() + 15, this->getY() + tsl::style::ListItemDefaultHeight - 2, bar_length * this->m_percentage, 7, 0xf00f);
+        renderer->drawCircle(this->getX() + 15 + bar_length * this->m_percentage, this->getY() + tsl::style::ListItemDefaultHeight + 1, 3, true, 0xf00f);
+    }
 
     /* Progress */
-    renderer->drawString(this->m_progress_text, false, this->getX() + 15, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
+    renderer->drawString(current_buffer, false, this->getX() + 15, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
 
     /* Repeat indicator */
     auto repeat_color = this->m_repeat ? tsl::style::color::ColorHighlight : tsl::style::color::ColorHeaderBar;
@@ -77,7 +100,10 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
     symbol::shuffle::symbol.draw(GetShuffleX(), GetShuffleY(), renderer, shuffle_color);
 
     /* Song length */
-    renderer->drawString(this->m_total_text, false, this->getX() + this->getWidth() - 75, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
+    renderer->drawString(total_buffer, false, this->getX() + this->getWidth() - 75, this->getY() + CenterOfLine(1) + 8, 20, 0xffff);
+
+    /* Backward button */
+    symbol::backward::symbol.draw(GetBackwardX(), GetBackwardY(), renderer, tsl::style::color::ColorText);
 
     /* Prev button */
     symbol::prev::symbol.draw(GetPrevX(), GetPrevY(), renderer, tsl::style::color::ColorText);
@@ -87,6 +113,9 @@ void StatusBar::draw(tsl::gfx::Renderer *renderer) {
 
     /* Next button */
     symbol::next::symbol.draw(GetNextX(), GetNextY(), renderer, tsl::style::color::ColorText);
+
+    /* Forward button */
+    symbol::forward::symbol.draw(GetForwardX(), GetForwardY(), renderer, tsl::style::color::ColorText);
 }
 
 void StatusBar::layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) {
@@ -113,6 +142,14 @@ bool StatusBar::onClick(u64 keys) {
     }
     if (keys & KEY_LEFT) {
         this->Prev();
+        handled++;
+    }
+    if (keys & KEY_ZL) {
+        this->Backward();
+        handled++;
+    }
+    if (keys & KEY_ZR) {
+        this->Forward();
         handled++;
     }
     return handled;
@@ -149,6 +186,14 @@ bool StatusBar::onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 pr
                 this->Next();
                 handled++;
             }
+            if (TOUCHED(Forward)) {
+                this->Forward();
+                handled++;
+            }
+            if (TOUCHED(Backward)) {
+                this->Backward();
+                handled++;
+            }
 
             if (handled > 0) {
                 this->m_clickAnimationProgress = 0;
@@ -160,20 +205,40 @@ bool StatusBar::onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 pr
     return false;
 }
 
-void StatusBar::update(AudioOutState state, const char *current_track, double percentage) {
-    this->m_state = state;
-    if (current_track == nullptr) {
-        this->m_current_track = "Not playing anything.";
-        this->m_text_width = 0;
-        this->m_scroll_offset = 0;
-        this->m_counter = 0;
-    } else if (this->m_current_track != current_track) {
-        this->m_current_track = current_track;
+void StatusBar::update() {
+    if (R_FAILED(tuneGetStatus(&this->m_playing)))
+        this->m_playing = false;
+
+    if (R_SUCCEEDED(tuneGetCurrentQueueItem(path_buffer, FS_MAX_PATH, &this->m_stats))) {
+        /* Only show file name. Ignore path to file and extension. */
+        size_t length = std::strlen(path_buffer);
+        NullLastDot(path_buffer);
+        for (size_t i = length; i >= 0; i--) {
+            if (path_buffer[i] == '/') {
+                if (this->m_current_track != path_buffer + i + 1) {
+                    this->m_current_track = path_buffer + i + 1;
+                    this->m_text_width = 0;
+                    this->m_scroll_offset = 0;
+                    this->m_counter = 0;
+                }
+                break;
+            }
+        }
+    } else {
+        this->m_current_track = "Stopped!";
+        this->m_stats = {};
+        /* Reset scrolling text */
         this->m_text_width = 0;
         this->m_scroll_offset = 0;
         this->m_counter = 0;
     }
-    this->m_percentage = percentage;
+    /* Progress text and bar */
+    u32 current = this->m_stats.current_frame / this->m_stats.sample_rate;
+    u32 total = this->m_stats.total_frames / this->m_stats.sample_rate;
+    this->m_percentage = std::clamp(float(this->m_stats.current_frame) / float(this->m_stats.total_frames), 0.0f, 1.0f);
+
+    std::snprintf(current_buffer, sizeof(current_buffer), "%d:%02d", current / 60, current % 60);
+    std::snprintf(total_buffer, sizeof(total_buffer), "%d:%02d", total / 60, total % 60);
 }
 
 void StatusBar::CycleRepeat() {
@@ -187,10 +252,10 @@ void StatusBar::CycleShuffle() {
 }
 
 void StatusBar::CyclePlay() {
-    if (this->m_state == AudioOutState_Stopped) {
-        tunePlay();
-    } else {
+    if (this->m_playing) {
         tunePause();
+    } else {
+        tunePlay();
     }
 }
 
@@ -202,13 +267,16 @@ void StatusBar::Next() {
     tuneNext();
 }
 
+void StatusBar::Forward() {
+    u32 next = std::min(this->m_stats.current_frame + (this->m_stats.total_frames / 10), this->m_stats.total_frames);
+    tuneSeek(next);
+}
+
+void StatusBar::Backward() {
+    u32 next = std::max(s64(this->m_stats.current_frame) - s64(this->m_stats.total_frames / 10), s64(0));
+    tuneSeek(next);
+}
+
 const AlphaSymbol &StatusBar::GetPlaybackSymbol() {
-    switch (this->m_state) {
-        case AudioOutState_Started:
-            return symbol::pause::symbol;
-        case AudioOutState_Stopped:
-            return symbol::play::symbol;
-        default:
-            return symbol::stop::symbol;
-    }
+    return this->m_playing ? symbol::pause::symbol : symbol::play::symbol;
 }

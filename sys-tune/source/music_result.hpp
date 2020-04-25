@@ -9,12 +9,15 @@ namespace ams::tune {
     R_DEFINE_ERROR_RESULT(InvalidArgument, 1);
     R_DEFINE_ERROR_RESULT(InvalidPath, 2);
     R_DEFINE_ERROR_RESULT(FileNotFound, 3);
+
     R_DEFINE_ERROR_RESULT(QueueEmpty, 10);
     R_DEFINE_ERROR_RESULT(NotPlaying, 11);
     R_DEFINE_ERROR_RESULT(OutOfRange, 12);
-    R_DEFINE_ERROR_RESULT(MpgFailure, 20);
-    R_DEFINE_ERROR_RESULT(MpgDone, 21);
-    R_DEFINE_ERROR_RESULT(BlockSizeTooBig, 22);
+
+    R_DEFINE_ERROR_RESULT(FileOpenFailure, 20);
+    R_DEFINE_ERROR_RESULT(AudrvVoiceInitFailure, 21);
+
+    R_DEFINE_ERROR_RESULT(OutOfMemory, 30);
 
 }
 
@@ -28,7 +31,15 @@ namespace ams::kern {
 }
 
 #ifndef RELEASE
+
+#ifdef SYS
+#define LOG(fmt, ...) 
+#endif /* SYS */
+
+#ifdef APPLET
 #define LOG(fmt, ...) std::printf(fmt, __VA_ARGS__);
+#endif /* APPLET */
+
 #else
 #define LOG(fmt, ...)
 #endif

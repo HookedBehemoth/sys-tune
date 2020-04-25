@@ -7,16 +7,15 @@
 
 class StatusBar : public tsl::elm::Element {
   private:
-    AudioOutState m_state;
+    bool m_playing;
     TuneRepeatMode m_repeat;
     TuneShuffleMode m_shuffle;
+    TuneCurrentStats m_stats;
+
+    float m_percentage;
+
     std::string_view m_current_track;
     std::string m_scroll_text;
-
-    const char *m_progress_text;
-    const char *m_total_text;
-    double m_percentage;
-
     u32 m_text_width;
     bool m_truncated;
     u32 m_scroll_offset;
@@ -25,7 +24,7 @@ class StatusBar : public tsl::elm::Element {
     bool m_touched = false;
 
   public:
-    StatusBar(const char *current_track, const char *progress_text, const char *total_text);
+    StatusBar();
 
     virtual tsl::elm::Element *requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) override;
     virtual void draw(tsl::gfx::Renderer *renderer) override;
@@ -33,12 +32,15 @@ class StatusBar : public tsl::elm::Element {
     virtual bool onClick(u64 keys) override;
     virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override;
 
-    void update(AudioOutState state, const char *current_track, double percentage);
+    void update();
+
     void CycleRepeat();
     void CyclePlay();
     void CycleShuffle();
     void Prev();
     void Next();
+    void Backward();
+    void Forward();
 
   private:
     ALWAYS_INLINE constexpr s32 CenterOfLine(u8 line) {
@@ -62,6 +64,12 @@ class StatusBar : public tsl::elm::Element {
     ALWAYS_INLINE s32 GetPlayStateY() {
         return this->getY() + CenterOfLine(2);
     }
+    ALWAYS_INLINE s32 GetBackwardX() {
+        return this->getX() + 30;
+    }
+    ALWAYS_INLINE s32 GetBackwardY() {
+        return this->getY() + CenterOfLine(2);
+    }
     ALWAYS_INLINE s32 GetPrevX() {
         return this->getX() + ((this->getWidth() / 4) * 1);
     }
@@ -72,6 +80,12 @@ class StatusBar : public tsl::elm::Element {
         return this->getX() + ((this->getWidth() / 4) * 3);
     }
     ALWAYS_INLINE s32 GetNextY() {
+        return this->getY() + CenterOfLine(2);
+    }
+    ALWAYS_INLINE s32 GetForwardX() {
+        return this->getX() + this->getWidth() - 30;
+    }
+    ALWAYS_INLINE s32 GetForwardY() {
         return this->getY() + CenterOfLine(2);
     }
     const AlphaSymbol &GetPlaybackSymbol();
