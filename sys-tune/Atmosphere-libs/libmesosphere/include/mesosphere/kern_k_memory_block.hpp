@@ -142,6 +142,8 @@ namespace ams::kern {
         KMemoryPermission_KernelWrite       = ams::svc::MemoryPermission_Write   << KMemoryPermission_KernelShift,
         KMemoryPermission_KernelExecute     = ams::svc::MemoryPermission_Execute << KMemoryPermission_KernelShift,
 
+        KMemoryPermission_NotMapped         = (1 << (2 * KMemoryPermission_KernelShift)),
+
         KMemoryPermission_KernelReadWrite   = KMemoryPermission_KernelRead | KMemoryPermission_KernelWrite,
         KMemoryPermission_KernelReadExecute = KMemoryPermission_KernelRead | KMemoryPermission_KernelExecute,
 
@@ -156,23 +158,19 @@ namespace ams::kern {
     };
 
     constexpr KMemoryPermission ConvertToKMemoryPermission(ams::svc::MemoryPermission perm) {
-        return static_cast<KMemoryPermission>((perm & KMemoryPermission_UserMask) | KMemoryPermission_KernelRead | ((perm & KMemoryPermission_UserWrite) << KMemoryPermission_KernelShift));
+        return static_cast<KMemoryPermission>((perm & KMemoryPermission_UserMask) | KMemoryPermission_KernelRead | ((perm & KMemoryPermission_UserWrite) << KMemoryPermission_KernelShift) | (perm == ams::svc::MemoryPermission_None ? KMemoryPermission_NotMapped : KMemoryPermission_None));
     }
 
     enum KMemoryAttribute : u8 {
         KMemoryAttribute_None           = 0x00,
-        KMemoryAttribute_Mask           = 0x7F,
-        KMemoryAttribute_All            = KMemoryAttribute_Mask,
-        KMemoryAttribute_DontCareMask   = 0x80,
+        KMemoryAttribute_UserMask       = 0x7F,
+        KMemoryAttribute_All            = 0xFF,
 
         KMemoryAttribute_Locked         = ams::svc::MemoryAttribute_Locked,
         KMemoryAttribute_IpcLocked      = ams::svc::MemoryAttribute_IpcLocked,
         KMemoryAttribute_DeviceShared   = ams::svc::MemoryAttribute_DeviceShared,
         KMemoryAttribute_Uncached       = ams::svc::MemoryAttribute_Uncached,
     };
-
-    static_assert((KMemoryAttribute_Mask & KMemoryAttribute_DontCareMask) == 0);
-    static_assert(static_cast<typename std::underlying_type<KMemoryAttribute>::type>(~(KMemoryAttribute_Mask | KMemoryAttribute_DontCareMask)) == 0);
 
     struct KMemoryInfo {
         uintptr_t address;
@@ -189,7 +187,7 @@ namespace ams::kern {
                 .addr             = this->address,
                 .size             = this->size,
                 .state            = static_cast<ams::svc::MemoryState>(this->state & KMemoryState_Mask),
-                .attr             = static_cast<ams::svc::MemoryAttribute>(this->attribute & KMemoryAttribute_Mask),
+                .attr             = static_cast<ams::svc::MemoryAttribute>(this->attribute & KMemoryAttribute_UserMask),
                 .perm             = static_cast<ams::svc::MemoryPermission>(this->perm & KMemoryPermission_UserMask),
                 .ipc_refcount     = this->ipc_lock_count,
                 .device_refcount  = this->device_use_count,
@@ -297,7 +295,7 @@ namespace ams::kern {
 
             constexpr bool HasProperties(KMemoryState s, KMemoryPermission p, KMemoryAttribute a) const {
                 MESOSPHERE_ASSERT_THIS();
-                constexpr auto AttributeIgnoreMask = KMemoryAttribute_DontCareMask | KMemoryAttribute_IpcLocked | KMemoryAttribute_DeviceShared;
+                constexpr auto AttributeIgnoreMask = KMemoryAttribute_IpcLocked | KMemoryAttribute_DeviceShared;
                 return this->memory_state == s && this->perm == p && (this->attribute | AttributeIgnoreMask) == (a | AttributeIgnoreMask);
             }
 

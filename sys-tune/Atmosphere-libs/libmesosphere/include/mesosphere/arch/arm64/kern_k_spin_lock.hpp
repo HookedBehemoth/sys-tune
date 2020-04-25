@@ -26,27 +26,27 @@ namespace ams::kern::arch::arm64 {
             constexpr KNotAlignedSpinLock() : packed_tickets(0) { /* ... */ }
 
             void Lock() {
-                u32 tmp0, tmp1;
+                u32 tmp0, tmp1, tmp2;
 
                 __asm__ __volatile__(
                     "    prfm   pstl1keep, %[packed_tickets]\n"
                     "1:\n"
                     "    ldaxr  %w[tmp0], %[packed_tickets]\n"
-                    "    add    %w[tmp0], %w[tmp0], #0x10000\n"
-                    "    stxr   %w[tmp1], %w[tmp0], %[packed_tickets]\n"
+                    "    add    %w[tmp2], %w[tmp0], #0x10000\n"
+                    "    stxr   %w[tmp1], %w[tmp2], %[packed_tickets]\n"
                     "    cbnz   %w[tmp1], 1b\n"
                     "    \n"
                     "    and    %w[tmp1], %w[tmp0], #0xFFFF\n"
                     "    cmp    %w[tmp1], %w[tmp0], lsr #16\n"
-                    "    b.eq   done"
+                    "    b.eq   3f\n"
                     "    sevl\n"
                     "2:\n"
                     "    wfe\n"
                     "    ldaxrh %w[tmp1], %[packed_tickets]\n"
                     "    cmp    %w[tmp1], %w[tmp0], lsr #16\n"
                     "    b.ne   2b\n"
-                    "done:\n"
-                    : [tmp0]"=&r"(tmp0), [tmp1]"=&r"(tmp1), [packed_tickets]"+Q"(this->packed_tickets)
+                    "3:\n"
+                    : [tmp0]"=&r"(tmp0), [tmp1]"=&r"(tmp1), [tmp2]"=&r"(tmp2), [packed_tickets]"+Q"(this->packed_tickets)
                     :
                     : "cc", "memory"
                 );
@@ -106,6 +106,6 @@ namespace ams::kern::arch::arm64 {
     };
     static_assert(sizeof(KAlignedSpinLock) == 2 * cpu::DataCacheLineSize);
 
-    using KSpinLock = KAlignedSpinLock;
+    using KSpinLock = KNotAlignedSpinLock;
 
 }
