@@ -105,7 +105,7 @@ Result tuneSeek(u32 position);
 /**
  * @brief Add track to queue.
  * @note Must not include leading mount name.
- * @note Must match ^(/.*.mp3)$
+ * @note Must match ^(sdmc:/.*.mp3)$
  * @param[in] path Path to file on sdcard.
  */
 Result tuneEnqueue(const char *path, TuneEnqueueType type);
