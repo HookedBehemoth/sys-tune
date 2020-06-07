@@ -62,7 +62,7 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION)
 
-CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++17
+CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -194,6 +194,8 @@ $(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp
 	@echo "built ... $(notdir $(OUTPUT).ovl)"
 
 $(OUTPUT).elf	:	$(OFILES)
+
+$(OFILES)		:	$(CURDIR)/../lib/include/tesla.hpp.gch
 
 $(OFILES_SRC)	: $(HFILES_BIN)
 

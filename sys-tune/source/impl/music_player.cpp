@@ -145,7 +145,7 @@ namespace tune::impl {
         should_run = false;
     }
 
-    void AudioThreadFunc(void *) {
+    void TuneThreadFunc(void *) {
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (should_run) {
             g_current = "";
@@ -194,7 +194,7 @@ namespace tune::impl {
         audrvClose(&g_drv);
     }
 
-    void PscThreadFunc(void *ptr) {
+    void PscmThreadFunc(void *ptr) {
         PscPmModule *module = static_cast<PscPmModule *>(ptr);
 
         while (should_run) {

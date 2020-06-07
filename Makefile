@@ -1,10 +1,11 @@
 export GITHASH := $(shell git rev-parse --short HEAD)
-export VERSION := 1.1.2
+export VERSION := 1.2.0
 export API_VERSION := 2
 
-all: overlay module
+all: overlay nxExt module
 
 clean:
+	$(MAKE) -C sys-tune/nxExt clean
 	$(MAKE) -C overlay clean
 	$(MAKE) -C sys-tune clean
 	rm -rf dist
@@ -12,6 +13,9 @@ clean:
 
 overlay:
 	$(MAKE) -C overlay
+
+nxExt:
+	$(MAKE) -C sys-tune/nxExt
 
 module:
 	$(MAKE) -C sys-tune

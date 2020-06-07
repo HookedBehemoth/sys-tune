@@ -54,7 +54,7 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 
 CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE -DWANT_FLAC -DWANT_MP3 -DWANT_WAV
 
-CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++2a
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)

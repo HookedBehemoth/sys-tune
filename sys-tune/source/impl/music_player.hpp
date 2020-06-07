@@ -17,8 +17,8 @@ namespace tune::impl {
     Result Initialize();
     void Exit();
 
-    void AudioThreadFunc(void *);
-    void PscThreadFunc(void *ptr);
+    void TuneThreadFunc(void *);
+    void PscmThreadFunc(void *ptr);
     void GpioThreadFunc(void *ptr);
 
     bool GetStatus();
