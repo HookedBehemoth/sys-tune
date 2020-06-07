@@ -1,8 +1,9 @@
-#include "music_control_service.hpp"
+#include "tune_service.hpp"
 
 #include "impl/music_player.hpp"
 #include "ipc_cmd.h"
-#include "music_result.hpp"
+#include "tune_result.hpp"
+#include "tune_types.hpp"
 
 #include <nxExt.h>
 

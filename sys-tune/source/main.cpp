@@ -1,8 +1,8 @@
 #include "impl/music_player.hpp"
 #include "impl/sdmc.hpp"
 #include "impl/source.hpp"
-#include "music_control_service.hpp"
-#include "music_result.hpp"
+#include "tune_service.hpp"
+#include "tune_result.hpp"
 
 extern "C" {
 u32 __nx_applet_type     = AppletType_None;

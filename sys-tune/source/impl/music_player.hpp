@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../types.hpp"
+#include "../tune_types.hpp"
 
 /* Default audio config. */
 constexpr const AudioRendererConfig audren_cfg = {

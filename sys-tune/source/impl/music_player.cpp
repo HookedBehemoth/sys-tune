@@ -1,6 +1,6 @@
 #include "music_player.hpp"
 
-#include "../music_result.hpp"
+#include "../tune_result.hpp"
 #include "sdmc.hpp"
 #include "source.hpp"
 

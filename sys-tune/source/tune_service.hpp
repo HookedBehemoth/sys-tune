@@ -1,5 +1,6 @@
 #pragma once
-#include "types.hpp"
+
+#include <switch.h>
 
 namespace tune {
 
