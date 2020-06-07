@@ -57,6 +57,18 @@ tsl::elm::Element *MainGui::createUI() {
     });
     list->addItem(browser_button);
 
+    auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
+    exit_button->setClickListener([](u64 keys){
+        if (keys & KEY_A) {
+            auto rc = tuneQuit();
+            printf("Quit: 0x%x\n", rc);
+            tsl::goBack();
+            return true;
+        }
+        return false;
+    });
+    list->addItem(exit_button);
+
     /* Volume indicator */
     list->addItem(this->m_volume_slider);
 

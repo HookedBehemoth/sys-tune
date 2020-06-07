@@ -5,44 +5,79 @@
 
 #include <tesla.hpp>
 
+constexpr const SocketInitConfig sockConf = {
+    .bsdsockets_version = 1,
+
+    .tcp_tx_buf_size     = 0x800,
+    .tcp_rx_buf_size     = 0x800,
+    .tcp_tx_buf_max_size = 0x25000,
+    .tcp_rx_buf_max_size = 0x25000,
+
+    .udp_tx_buf_size = 0x800,
+    .udp_rx_buf_size = 0x800,
+
+    .sb_efficiency = 1,
+
+    .num_bsd_sessions = 0,
+    .bsd_service_type = BsdServiceType_Auto,
+};
+
 class OverlayTest : public tsl::Overlay {
   private:
-    bool running, supported;
-    Result init_rc;
+    const char *msg = nullptr;
+    Result fail     = 0;
+    int nxlink;
 
   public:
     virtual void initServices() override {
-        this->init_rc = tuneInitialize();
-        if (R_SUCCEEDED(this->init_rc)) {
-            this->running = true;
-            u32 api;
-            if (R_SUCCEEDED(tuneGetApiVersion(&api))) {
-                supported = api == TUNE_API_VERSION;
-            } else {
-                supported = false;
+        socketInitialize(&sockConf);
+        nxlink = nxlinkStdio();
+
+        Result rc = tuneInitialize();
+
+        if (rc == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
+            u64 pid = 0;
+            const NcmProgramLocation programLocation{
+                .program_id = 0x4200000000000000,
+                .storageID  = NcmStorageId_None,
+            };
+            rc = pmshellInitialize();
+            if (R_SUCCEEDED(rc))
+                rc = pmshellLaunchProgram(0, &programLocation, &pid);
+            pmshellExit();
+            if (R_FAILED(rc) || pid == 0) {
+                this->fail = rc;
+                this->msg  = "  Failed to\n"
+                            "launch sysmodule";
+                return;
             }
-        } else if (this->init_rc != MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
-            this->running = true;
-        } else {
-            this->running = false;
+            svcSleepThread(100'000'000);
+            rc = tuneInitialize();
+        }
+        if (R_FAILED(rc)) {
+            this->msg  = "Something went wrong:";
+            this->fail = rc;
+        }
+
+        u32 api;
+        if (R_FAILED(tuneGetApiVersion(&api)) || api != TUNE_API_VERSION) {
+            this->msg = "   Unsupported\n"
+                        "sys-tune version!";
         }
     }
     virtual void exitServices() override {
-        if (R_SUCCEEDED(this->init_rc))
-            tuneExit();
+        tuneExit();
+        ::close(nxlink);
+        socketExit();
     }
 
     virtual void onShow() override {}
     virtual void onHide() override {}
 
     virtual std::unique_ptr<tsl::Gui> loadInitialGui() override {
-        if (!this->running) {
-            return std::make_unique<ErrorGui>("sys-tune service not running!");
-        } else if (R_FAILED(this->init_rc)) {
-            return std::make_unique<ErrorGui>("Something went wrong:", this->init_rc);
-        } else if (!supported) {
-            return std::make_unique<ErrorGui>("Unsupported sys-tune version!");
-        }else {
+        if (this->msg) {
+            return std::make_unique<ErrorGui>(this->msg, this->fail);
+        } else {
             return std::make_unique<MainGui>();
         }
     }

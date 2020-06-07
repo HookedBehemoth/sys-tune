@@ -4,93 +4,78 @@
 
 namespace ams::tune {
 
-    Result ControlService::GetStatus(sf::Out<bool> out) {
+    extern ams::sf::hipc::ServerManager<1> g_server_manager;
+
+    void ControlService::GetStatus(sf::Out<bool> out) {
         out.SetValue(impl::GetStatus());
-        return ResultSuccess();
     }
 
-    Result ControlService::Play() {
+    void ControlService::Play() {
         impl::Play();
-        return ResultSuccess();
     }
 
-    Result ControlService::Pause() {
+    void ControlService::Pause() {
         impl::Pause();
-        return ResultSuccess();
     }
 
-    Result ControlService::Next() {
+    void ControlService::Next() {
         impl::Next();
-        return ResultSuccess();
     }
 
-    Result ControlService::Prev() {
+    void ControlService::Prev() {
         impl::Prev();
-        return ResultSuccess();
     }
 
-    Result ControlService::GetVolume(sf::Out<float> out) {
+    void ControlService::GetVolume(sf::Out<float> out) {
         out.SetValue(impl::GetVolume());
-        return ResultSuccess();
     }
 
-    Result ControlService::SetVolume(float volume) {
+    void ControlService::SetVolume(float volume) {
         impl::SetVolume(volume);
-        return ResultSuccess();
     }
 
-    Result ControlService::GetRepeatMode(sf::Out<RepeatMode> mode) {
+    void ControlService::GetRepeatMode(sf::Out<RepeatMode> mode) {
         mode.SetValue(impl::GetRepeatMode());
-        return ResultSuccess();
     }
 
-    Result ControlService::SetRepeatMode(RepeatMode mode) {
+    void ControlService::SetRepeatMode(RepeatMode mode) {
         impl::SetRepeatMode(mode);
-        return ResultSuccess();
     }
 
-    Result ControlService::GetShuffleMode(sf::Out<ShuffleMode> mode) {
+    void ControlService::GetShuffleMode(sf::Out<ShuffleMode> mode) {
         mode.SetValue(impl::GetShuffleMode());
-        return ResultSuccess();
     }
 
-    Result ControlService::SetShuffleMode(ShuffleMode mode) {
+    void ControlService::SetShuffleMode(ShuffleMode mode) {
         impl::SetShuffleMode(mode);
-        return ResultSuccess();
     }
 
-    Result ControlService::GetCurrentPlaylistSize(sf::Out<u32> size) {
+    void ControlService::GetCurrentPlaylistSize(sf::Out<u32> size) {
         size.SetValue(impl::GetCurrentPlaylistSize());
-        return ResultSuccess();
     }
 
-    Result ControlService::GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
+    void ControlService::GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
         size.SetValue(impl::GetCurrentPlaylist((char*)buffer.GetPointer(), buffer.GetSize()));
-        return ResultSuccess();
     }
 
     Result ControlService::GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer) {
         return impl::GetCurrentQueueItem(out.GetPointer(), (char*)buffer.GetPointer(), buffer.GetSize());
     }
 
-    Result ControlService::ClearQueue() {
+    void ControlService::ClearQueue() {
         impl::ClearQueue();
-        return ResultSuccess();
     }
 
-    Result ControlService::MoveQueueItem(u32 src, u32 dst) {
+    void ControlService::MoveQueueItem(u32 src, u32 dst) {
         impl::MoveQueueItem(src, dst);
-        return ResultSuccess();
     }
 
-    Result ControlService::Select(u32 index) {
+    void ControlService::Select(u32 index) {
         impl::Select(index);
-        return ResultSuccess();
     }
 
-    Result ControlService::Seek(u32 position) {
+    void ControlService::Seek(u32 position) {
         impl::Seek(position);
-        return ResultSuccess();
     }
 
     Result ControlService::Enqueue(sf::InBuffer buffer, EnqueueType type) {
@@ -99,6 +84,10 @@ namespace ams::tune {
 
     Result ControlService::Remove(u32 index) {
         return impl::Remove(index);
+    }
+
+    void ControlService::QuitServer() {
+        g_server_manager.RequestStopProcessing();
     }
 
 }

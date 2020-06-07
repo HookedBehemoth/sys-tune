@@ -131,6 +131,10 @@ Result tuneRemove(u32 index) {
     return serviceDispatchIn(&g_tune, 41, index);
 }
 
+Result tuneQuit() {
+    return serviceDispatch(&g_tune, 50);
+}
+
 Result tuneGetApiVersion(u32 *version) {
     return serviceDispatchOut(&g_tune, 5000, *version);
 }

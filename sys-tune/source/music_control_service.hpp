@@ -32,34 +32,38 @@ namespace ams::tune {
             Enqueue = 40,
             Remove = 41,
 
+            QuitServer = 50,
+
             GetApiVersion = 5000,
         };
 
       public:
-        virtual Result GetStatus(sf::Out<bool> out);
-        virtual Result Play();
-        virtual Result Pause();
-        virtual Result Next();
-        virtual Result Prev();
+        virtual void GetStatus(sf::Out<bool> out);
+        virtual void Play();
+        virtual void Pause();
+        virtual void Next();
+        virtual void Prev();
 
-        virtual Result GetVolume(sf::Out<float> out);
-        virtual Result SetVolume(float volume);
+        virtual void GetVolume(sf::Out<float> out);
+        virtual void SetVolume(float volume);
 
-        virtual Result GetRepeatMode(sf::Out<RepeatMode> mode);
-        virtual Result SetRepeatMode(RepeatMode mode);
-        virtual Result GetShuffleMode(sf::Out<ShuffleMode> mode);
-        virtual Result SetShuffleMode(ShuffleMode mode);
+        virtual void GetRepeatMode(sf::Out<RepeatMode> mode);
+        virtual void SetRepeatMode(RepeatMode mode);
+        virtual void GetShuffleMode(sf::Out<ShuffleMode> mode);
+        virtual void SetShuffleMode(ShuffleMode mode);
 
-        virtual Result GetCurrentPlaylistSize(sf::Out<u32> size);
-        virtual Result GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer);
+        virtual void GetCurrentPlaylistSize(sf::Out<u32> size);
+        virtual void GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer);
         virtual Result GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer);
-        virtual Result ClearQueue();
-        virtual Result MoveQueueItem(u32 src, u32 dst);
-        virtual Result Select(u32 index);
-        virtual Result Seek(u32 position);
+        virtual void ClearQueue();
+        virtual void MoveQueueItem(u32 src, u32 dst);
+        virtual void Select(u32 index);
+        virtual void Seek(u32 position);
 
         virtual Result Enqueue(sf::InBuffer buffer, EnqueueType type);
         virtual Result Remove(u32 index);
+
+        virtual void QuitServer();
 
         virtual Result GetApiVersion(sf::Out<u32> version) {
             version.SetValue(TUNE_API_VERSION);
@@ -92,6 +96,8 @@ namespace ams::tune {
 
             MAKE_SERVICE_COMMAND_META(Enqueue),
             MAKE_SERVICE_COMMAND_META(Remove),
+
+            MAKE_SERVICE_COMMAND_META(QuitServer),
 
             MAKE_SERVICE_COMMAND_META(GetApiVersion),
         };

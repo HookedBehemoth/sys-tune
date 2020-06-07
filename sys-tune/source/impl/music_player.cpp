@@ -196,7 +196,7 @@ namespace ams::tune::impl {
         PscPmModule *module = static_cast<PscPmModule *>(ptr);
 
         while (should_run) {
-            R_TRY_CATCH(eventWait(&module->event, UINT64_MAX)) {
+            R_TRY_CATCH(eventWait(&module->event, 10'000'000)) {
                 R_CATCH(kern::ResultWaitTimeout) {
                     continue;
                 }

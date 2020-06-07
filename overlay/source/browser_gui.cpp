@@ -86,10 +86,7 @@ void BrowserGui::scanCwd() {
             auto *item = new tsl::elm::ListItem(elm.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-                    std::snprintf(this->cwd, FS_MAX_PATH, "%s%s/", this->cwd, item->getText().c_str());
-#pragma GCC diagnostic pop
+                    std::sprintf(this->cwd, "%s%s/", this->cwd, item->getText().c_str());
                     this->scanCwd();
                     return true;
                 }
@@ -101,11 +98,9 @@ void BrowserGui::scanCwd() {
             auto *item = new tsl::elm::ListItem(elm.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-                    std::snprintf(path_buffer, FS_MAX_PATH, "sdmc:%s%s", this->cwd, item->getText().c_str());
-#pragma GCC diagnostic pop
-                    tuneEnqueue(path_buffer, TuneEnqueueType_Last);
+                    std::sprintf(path_buffer, "sdmc:%s%s", this->cwd, item->getText().c_str());
+                    auto rc = tuneEnqueue(path_buffer, TuneEnqueueType_Last);
+                    printf("enqueue 0x%x\n", rc);
                     return true;
                 }
                 return false;

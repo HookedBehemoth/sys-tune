@@ -6,7 +6,7 @@
 extern "C" {
 extern u32 __start__;
 
-u32 __nx_applet_type = AppletType_None;
+u32 __nx_applet_type     = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 
 #define INNER_HEAP_SIZE 0x60000
@@ -38,7 +38,7 @@ namespace ams {
 using namespace ams;
 
 void __libnx_initheap(void) {
-    void *addr = nx_inner_heap;
+    void *addr  = nx_inner_heap;
     size_t size = nx_inner_heap_size;
 
     /* Newlib */
@@ -46,7 +46,7 @@ void __libnx_initheap(void) {
     extern char *fake_heap_end;
 
     fake_heap_start = (char *)addr;
-    fake_heap_end = (char *)addr + size;
+    fake_heap_end   = (char *)addr + size;
 }
 
 void __appInit() {
@@ -76,8 +76,7 @@ void __appExit(void) {
     pscmExit();
     gpioExit();
 }
-
-namespace {
+namespace ams::tune {
 
     /* music */
     constexpr size_t NumServers = 1;
@@ -114,9 +113,9 @@ int main(int argc, char *argv[]) {
     R_ABORT_UNLESS(threadStart(&audioThread));
 
     /* Create services */
-    R_ABORT_UNLESS(g_server_manager.RegisterServer<tune::ControlService>(MusicServiceName, MusicMaxSessions));
+    R_ABORT_UNLESS(tune::g_server_manager.RegisterServer<tune::ControlService>(tune::MusicServiceName, tune::MusicMaxSessions));
 
-    g_server_manager.LoopProcess();
+    tune::g_server_manager.LoopProcess();
 
     tune::impl::Exit();
     svcCancelSynchronization(gpioThread.handle);
@@ -280,14 +279,14 @@ int main(int argc, char *argv[]) {
             static u64 tick = 0;
             if ((tick % 30) == 0) {
                 auto [current, total] = g_source->Tell();
-                u32 length = total / g_source->GetSampleRate();
+                u32 length            = total / g_source->GetSampleRate();
                 std::printf("%d/%d %d:%d\n", current, total, length / 60, length % 60);
             }
             tick++;
 
             if (kDown & (KEY_ZL | KEY_ZR)) {
                 auto [current, total] = g_source->Tell();
-                u64 next = current;
+                u64 next              = current;
                 if (kDown & KEY_ZL) {
                     next = std::max(s64(current) - s64(total / 10), s64(0));
                 } else {

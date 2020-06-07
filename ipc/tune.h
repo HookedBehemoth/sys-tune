@@ -112,6 +112,8 @@ Result tuneEnqueue(const char *path, TuneEnqueueType type);
 
 Result tuneRemove(u32 index);
 
+Result tuneQuit();
+
 Result tuneGetApiVersion(u32 *version);
 
 #ifdef __cplusplus

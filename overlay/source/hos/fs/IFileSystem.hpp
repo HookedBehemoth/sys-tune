@@ -3,6 +3,7 @@
 #include "IDirectory.hpp"
 #include "IFile.hpp"
 
+#include <cstdio>
 #include <memory>
 #include <switch.h>
 
