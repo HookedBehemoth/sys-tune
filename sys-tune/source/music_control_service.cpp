@@ -1,93 +1,152 @@
 #include "music_control_service.hpp"
 
 #include "impl/music_player.hpp"
+#include "ipc_cmd.h"
+#include "music_result.hpp"
 
-namespace ams::tune {
+#include <nxExt.h>
 
-    extern ams::sf::hipc::ServerManager<1> g_server_manager;
+#define GET_SINGLE(type, expr)            \
+    ({                                    \
+        *out_dataSize     = sizeof(type); \
+        *(type *)out_data = expr();       \
+        return 0;                         \
+    })
 
-    void ControlService::GetStatus(sf::Out<bool> out) {
-        out.SetValue(impl::GetStatus());
+#define SET_SINGLE(type, expr)              \
+    ({                                      \
+        if (r->data.size >= sizeof(type)) { \
+            expr(*(type *)r->data.ptr);     \
+            return 0;                       \
+        }                                   \
+        break;                              \
+    })
+
+namespace tune {
+
+    namespace {
+
+        IpcServer g_server;
+        bool running = true;
+
+        Result ServiceHandlerFunc(void *arg, const IpcServerRequest *r, u8 *out_data, size_t *out_dataSize) {
+            switch (r->data.cmdId) {
+                case TuneIpcCmd_GetStatus:
+                    GET_SINGLE(bool, impl::GetStatus);
+
+                case TuneIpcCmd_Play:
+                    impl::Play();
+                    return 0;
+
+                case TuneIpcCmd_Pause:
+                    impl::Pause();
+                    return 0;
+
+                case TuneIpcCmd_Next:
+                    impl::Next();
+                    return 0;
+
+                case TuneIpcCmd_Prev:
+                    impl::Prev();
+                    return 0;
+
+                case TuneIpcCmd_GetVolume:
+                    GET_SINGLE(float, impl::GetVolume);
+
+                case TuneIpcCmd_SetVolume:
+                    SET_SINGLE(float, impl::SetVolume);
+
+                case TuneIpcCmd_GetRepeatMode:
+                    GET_SINGLE(RepeatMode, impl::GetRepeatMode);
+
+                case TuneIpcCmd_SetRepeatMode:
+                    SET_SINGLE(RepeatMode, impl::SetRepeatMode);
+
+                case TuneIpcCmd_GetShuffleMode:
+                    GET_SINGLE(ShuffleMode, impl::GetShuffleMode);
+
+                case TuneIpcCmd_SetShuffleMode:
+                    SET_SINGLE(ShuffleMode, impl::SetShuffleMode);
+
+                case TuneIpcCmd_GetCurrentPlaylistSize:
+                    GET_SINGLE(u32, impl::GetCurrentPlaylistSize);
+
+                case TuneIpcCmd_GetCurrentPlaylist:
+                    if (r->hipc.meta.num_recv_buffers >= 1) {
+                        *out_dataSize    = sizeof(u32);
+                        *(u32 *)out_data = impl::GetCurrentPlaylist(
+                            (char *)hipcGetBufferAddress(r->hipc.data.recv_buffers),
+                            hipcGetBufferSize(r->hipc.data.recv_buffers));
+                        return 0;
+                    }
+                    break;
+
+                case TuneIpcCmd_GetCurrentQueueItem:
+                    if (r->hipc.meta.num_recv_buffers >= 1) {
+                        *out_dataSize = sizeof(CurrentStats);
+                        return impl::GetCurrentQueueItem(
+                            (CurrentStats *)out_data,
+                            (char *)hipcGetBufferAddress(r->hipc.data.recv_buffers),
+                            hipcGetBufferSize(r->hipc.data.recv_buffers));
+                    }
+                    break;
+
+                case TuneIpcCmd_ClearQueue:
+                    impl::ClearQueue();
+                    return 0;
+
+                case TuneIpcCmd_MoveQueueItem:
+                    if (r->data.size >= 2 * sizeof(u32)) {
+                        u32 *data = (u32 *)r->data.ptr;
+                        impl::MoveQueueItem(data[0], data[1]);
+                        return 0;
+                    }
+                    break;
+
+                case TuneIpcCmd_Select:
+                    SET_SINGLE(u32, impl::Select);
+
+                case TuneIpcCmd_Seek:
+                    SET_SINGLE(u32, impl::Seek);
+
+                case TuneIpcCmd_Enqueue:
+                    if (r->hipc.meta.num_send_buffers >= 1 && r->data.size >= sizeof(EnqueueType)) {
+                        return impl::Enqueue(
+                            (const char *)hipcGetBufferAddress(r->hipc.data.send_buffers),
+                            hipcGetBufferSize(r->hipc.data.send_buffers),
+                            *(EnqueueType *)r->data.ptr);
+                    }
+
+                case TuneIpcCmd_Remove:
+                    SET_SINGLE(u32, impl::Remove);
+
+                case TuneIpcCmd_QuitServer:
+                    running = false;
+                    return 0;
+
+                case TuneIpcCmd_GetApiVersion:
+                    *out_dataSize    = sizeof(u32);
+                    *(u32 *)out_data = TUNE_API_VERSION;
+                    return 0;
+            }
+            return tune::Generic;
+        }
+
     }
 
-    void ControlService::Play() {
-        impl::Play();
+    Result InitializeServer() {
+        return ipcServerInit(&g_server, "tune", 2);
     }
 
-    void ControlService::Pause() {
-        impl::Pause();
+    Result ExitServer() {
+        return ipcServerExit(&g_server);
     }
 
-    void ControlService::Next() {
-        impl::Next();
-    }
-
-    void ControlService::Prev() {
-        impl::Prev();
-    }
-
-    void ControlService::GetVolume(sf::Out<float> out) {
-        out.SetValue(impl::GetVolume());
-    }
-
-    void ControlService::SetVolume(float volume) {
-        impl::SetVolume(volume);
-    }
-
-    void ControlService::GetRepeatMode(sf::Out<RepeatMode> mode) {
-        mode.SetValue(impl::GetRepeatMode());
-    }
-
-    void ControlService::SetRepeatMode(RepeatMode mode) {
-        impl::SetRepeatMode(mode);
-    }
-
-    void ControlService::GetShuffleMode(sf::Out<ShuffleMode> mode) {
-        mode.SetValue(impl::GetShuffleMode());
-    }
-
-    void ControlService::SetShuffleMode(ShuffleMode mode) {
-        impl::SetShuffleMode(mode);
-    }
-
-    void ControlService::GetCurrentPlaylistSize(sf::Out<u32> size) {
-        size.SetValue(impl::GetCurrentPlaylistSize());
-    }
-
-    void ControlService::GetCurrentPlaylist(sf::Out<u32> size, sf::OutBuffer buffer) {
-        size.SetValue(impl::GetCurrentPlaylist((char*)buffer.GetPointer(), buffer.GetSize()));
-    }
-
-    Result ControlService::GetCurrentQueueItem(sf::Out<CurrentStats> out, sf::OutBuffer buffer) {
-        return impl::GetCurrentQueueItem(out.GetPointer(), (char*)buffer.GetPointer(), buffer.GetSize());
-    }
-
-    void ControlService::ClearQueue() {
-        impl::ClearQueue();
-    }
-
-    void ControlService::MoveQueueItem(u32 src, u32 dst) {
-        impl::MoveQueueItem(src, dst);
-    }
-
-    void ControlService::Select(u32 index) {
-        impl::Select(index);
-    }
-
-    void ControlService::Seek(u32 position) {
-        impl::Seek(position);
-    }
-
-    Result ControlService::Enqueue(sf::InBuffer buffer, EnqueueType type) {
-        return impl::Enqueue((char*)buffer.GetPointer(), buffer.GetSize(), type);
-    }
-
-    Result ControlService::Remove(u32 index) {
-        return impl::Remove(index);
-    }
-
-    void ControlService::QuitServer() {
-        g_server_manager.RequestStopProcessing();
+    void LoopProcess() {
+        while (running) {
+            if (ipcServerProcess(&g_server, ServiceHandlerFunc, nullptr) == KERNELRESULT(Cancelled))
+                break;
+        }
     }
 
 }

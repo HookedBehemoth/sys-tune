@@ -2,9 +2,9 @@
 
 #include "../../ipc/tune.h"
 
-#include <stratosphere.hpp>
+#include <functional>
 
-namespace ams::tune {
+namespace tune {
 
     enum class PlayerStatus : u8 {
         Playing,
@@ -27,22 +27,27 @@ namespace ams::tune {
         Last,
     };
 
-    struct ScopedOutBuffer {
-        NON_COPYABLE(ScopedOutBuffer);
-        NON_MOVEABLE(ScopedOutBuffer);
-        AudioOutBuffer buffer;
-        ScopedOutBuffer() : buffer({}) {}
-        bool init(size_t buffer_size) {
-            buffer.buffer = aligned_alloc(0x1000, buffer_size);
-            buffer.buffer_size = buffer_size;
-            return buffer.buffer;
-        }
-        ~ScopedOutBuffer() {
-            if (buffer.buffer)
-                free(buffer.buffer);
-        }
-    };
-
     struct CurrentStats : TuneCurrentStats {};
+
+    class ScopeGuard {
+        ScopeGuard(const ScopeGuard &) = delete;
+        ScopeGuard &operator=(const ScopeGuard &) = delete;
+        ScopeGuard(ScopeGuard &&)                 = delete;
+        ScopeGuard &operator=(ScopeGuard &&) = delete;
+
+      private:
+        std::function<void()> f;
+
+      public:
+        ScopeGuard(std::function<void()> f) : f(std::move(f)) {}
+        ~ScopeGuard() {
+            if (f) {
+                f();
+            }
+            f = nullptr;
+        }
+        void dismiss() { f = nullptr; }
+        void invoke() { this->~ScopeGuard(); }
+    };
 
 }

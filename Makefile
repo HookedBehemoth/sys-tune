@@ -22,7 +22,6 @@ dist: all
 	mkdir -p dist/atmosphere/contents/4200000000000000/flags
 	touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
-	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/toolbox.json
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./*; cd ../;
 

@@ -1,39 +1,49 @@
 #pragma once
 
-#include <stratosphere.hpp>
+#include <switch.h>
 
-namespace ams::tune {
+namespace tune {
 
-    R_DEFINE_NAMESPACE_RESULT_MODULE(420);
+    constexpr const u32 Module = 420;
 
-    R_DEFINE_ERROR_RESULT(InvalidArgument, 1);
-    R_DEFINE_ERROR_RESULT(InvalidPath, 2);
-    R_DEFINE_ERROR_RESULT(FileNotFound, 3);
-
-    R_DEFINE_ERROR_RESULT(QueueEmpty, 10);
-    R_DEFINE_ERROR_RESULT(NotPlaying, 11);
-    R_DEFINE_ERROR_RESULT(OutOfRange, 12);
-
-    R_DEFINE_ERROR_RESULT(FileOpenFailure, 20);
-    R_DEFINE_ERROR_RESULT(AudrvVoiceInitFailure, 21);
-
-    R_DEFINE_ERROR_RESULT(OutOfMemory, 30);
+    constexpr const Result InvalidArgument  = MAKERESULT(Module, 1);
+    constexpr const Result InvalidPath      = MAKERESULT(Module, 2);
+    constexpr const Result FileNotFound     = MAKERESULT(Module, 3);
+    constexpr const Result QueueEmpty       = MAKERESULT(Module, 10);
+    constexpr const Result NotPlaying       = MAKERESULT(Module, 11);
+    constexpr const Result OutOfRange       = MAKERESULT(Module, 12);
+    constexpr const Result FileOpenFailure  = MAKERESULT(Module, 20);
+    constexpr const Result VoiceInitFailure = MAKERESULT(Module, 21);
+    constexpr const Result OutOfMemory      = MAKERESULT(Module, 30);
+    constexpr const Result Generic          = MAKERESULT(Module, 40);
 
 }
 
-namespace ams::kern {
+#define R_UNLESS(bool_expr, res) \
+    ({                           \
+        if (!(bool_expr)) {      \
+            return res;          \
+        }                        \
+    })
 
-    R_DEFINE_NAMESPACE_RESULT_MODULE(1);
+#define R_TRY(res_expr)                   \
+    ({                                    \
+        const auto temp_res = (res_expr); \
+        if (R_FAILED(temp_res))           \
+            return temp_res;              \
+    })
 
-    R_DEFINE_ERROR_RESULT(WaitTimeout, 117);
-    R_DEFINE_ERROR_RESULT(OperationCanceled, 118);
-
-}
+#define R_ABORT_UNLESS(res_expr)   \
+    ({                             \
+        auto tmp_res = (res_expr); \
+        if (R_FAILED(tmp_res))     \
+            fatalThrow(tmp_res);   \
+    })
 
 #ifndef RELEASE
 
 #ifdef SYS
-#define LOG(fmt, ...) 
+#define LOG(fmt, ...)
 #endif /* SYS */
 
 #ifdef APPLET

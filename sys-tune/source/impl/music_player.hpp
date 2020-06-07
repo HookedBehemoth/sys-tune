@@ -12,7 +12,7 @@ constexpr const AudioRendererConfig audren_cfg = {
     .num_mix_buffers = 2,
 };
 
-namespace ams::tune::impl {
+namespace tune::impl {
 
     Result Initialize();
     void Exit();

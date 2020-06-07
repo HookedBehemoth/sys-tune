@@ -1,15 +1,18 @@
 #include "music_player.hpp"
 
 #include "../music_result.hpp"
-
-#include <list>
-#include <string>
-
+#include "sdmc.hpp"
 #include "source.hpp"
+
+#include <algorithm>
+#include <cstring>
+#include <nxExt.h>
+#include <string>
+#include <vector>
 
 Source *g_source = nullptr;
 
-namespace ams::tune::impl {
+namespace tune::impl {
 
     namespace {
 
@@ -17,32 +20,29 @@ namespace ams::tune::impl {
         std::vector<std::string> g_shuffle_playlist;
         std::string g_current = "";
         u32 g_queue_position;
-        os::Mutex g_mutex(false);
+        LockableMutex g_mutex;
 
-        RepeatMode g_repeat = RepeatMode::All;
+        RepeatMode g_repeat   = RepeatMode::All;
         ShuffleMode g_shuffle = ShuffleMode::Off;
         PlayerStatus g_status = PlayerStatus::FetchNext;
 
         AudioDriver g_drv;
-        u8 *audMemPool = nullptr;
-        constexpr const int MinSampleCount = 256;
+        u8 *audMemPool                      = nullptr;
+        constexpr const int MinSampleCount  = 256;
         constexpr const int MaxChannelCount = 8;
-        constexpr const int BufferCount = 2;
+        constexpr const int BufferCount     = 2;
         constexpr const int AudioSampleSize = MinSampleCount * MaxChannelCount * sizeof(s16);
 
         bool should_pause = false;
-        bool should_run = true;
+        bool should_run   = true;
 
         Result PlayTrack(const std::string &path) {
             /* Open file and allocate */
-            Source *source = OpenFile(path.c_str());
-            R_UNLESS(source != nullptr, ResultFileOpenFailure());
+            auto source = std::unique_ptr<Source>(OpenFile(path.c_str()));
+            R_UNLESS(source != nullptr, tune::FileOpenFailure);
+            R_UNLESS(source->IsOpen(), tune::FileOpenFailure);
 
-            ON_SCOPE_EXIT { delete source; };
-            R_UNLESS(source->IsOpen(), ResultFileOpenFailure());
-
-            R_UNLESS(audrvVoiceInit(&g_drv, 0, source->GetChannelCount(), PcmFormat_Int16, source->GetSampleRate()), ResultAudrvVoiceInitFailure());
-            ON_SCOPE_EXIT { audrvVoiceDrop(&g_drv, 0); };
+            R_UNLESS(audrvVoiceInit(&g_drv, 0, source->GetChannelCount(), PcmFormat_Int16, source->GetSampleRate()), tune::VoiceInitFailure);
 
             audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
 
@@ -53,18 +53,17 @@ namespace ams::tune::impl {
             }
             audrvVoiceStart(&g_drv, 0);
 
-            const s32 sample_count = AudioSampleSize / channel_count / sizeof(s16);
+            const s32 sample_count        = AudioSampleSize / channel_count / sizeof(s16);
             AudioDriverWaveBuf buffers[2] = {};
 
             for (int i = 0; i < 2; i++) {
-                buffers[i].data_pcm16 = (s16 *)audMemPool;
-                buffers[i].size = AudioSampleSize;
+                buffers[i].data_pcm16          = (s16 *)audMemPool;
+                buffers[i].size                = AudioSampleSize;
                 buffers[i].start_sample_offset = i * sample_count;
-                buffers[i].end_sample_offset = buffers[i].start_sample_offset + sample_count;
+                buffers[i].end_sample_offset   = buffers[i].start_sample_offset + sample_count;
             }
 
-            g_source = source;
-            ON_SCOPE_EXIT { g_source = nullptr; };
+            g_source = source.get();
 
             while (should_run && g_status == PlayerStatus::Playing) {
                 if (should_pause) {
@@ -102,7 +101,10 @@ namespace ams::tune::impl {
                 audrenWaitFrame();
             }
 
-            return ResultSuccess();
+            audrvVoiceDrop(&g_drv, 0);
+            g_source = nullptr;
+
+            return 0;
         }
 
     }
@@ -110,7 +112,7 @@ namespace ams::tune::impl {
     Result Initialize() {
         /* Create audio driver. */
         R_TRY(audrvCreate(&g_drv, &audren_cfg, 2));
-        auto audrv_guard = SCOPE_GUARD { audrvClose(&g_drv); };
+        ScopeGuard audrv_guard([] { audrvClose(&g_drv); });
 
         /* Align memory pool size. */
         const int poolSize = (AudioSampleSize * BufferCount + (AUDREN_MEMPOOL_ALIGNMENT - 1)) & ~(AUDREN_MEMPOOL_ALIGNMENT - 1);
@@ -118,25 +120,25 @@ namespace ams::tune::impl {
         /* Allocate memory aligned. */
         audMemPool = new (std::align_val_t(AUDREN_MEMPOOL_ALIGNMENT), std::nothrow) u8[poolSize];
         if (audMemPool == nullptr)
-            return ResultOutOfMemory();
-        auto buffer_guard = SCOPE_GUARD { delete[] audMemPool; };
+            return tune::OutOfMemory;
+        ScopeGuard buffer_guard([] { delete[] audMemPool; audMemPool = nullptr; });
 
         /* Register memory pool. */
         int mpid = audrvMemPoolAdd(&g_drv, audMemPool, poolSize);
         audrvMemPoolAttach(&g_drv, mpid);
 
         /* Attach default sink. */
-        constexpr const u8 sink_channels[] = {0, 1};
+        u8 sink_channels[] = {0, 1};
         audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
         R_TRY(audrvUpdate(&g_drv));
 
         R_TRY(audrenStartAudioRenderer());
 
         /* Dismiss our safety guards as everything succeeded. */
-        buffer_guard.Cancel();
-        audrv_guard.Cancel();
+        buffer_guard.dismiss();
+        audrv_guard.dismiss();
 
-        return ResultSuccess();
+        return 0;
     }
 
     void Exit() {
@@ -150,7 +152,7 @@ namespace ams::tune::impl {
             {
                 std::scoped_lock lk(g_mutex);
 
-                auto &queue = (g_shuffle == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
+                auto &queue       = (g_shuffle == ShuffleMode::On) ? g_shuffle_playlist : g_playlist;
                 size_t queue_size = queue.size();
                 if (queue_size == 0) {
                     g_current = "";
@@ -196,15 +198,11 @@ namespace ams::tune::impl {
         PscPmModule *module = static_cast<PscPmModule *>(ptr);
 
         while (should_run) {
-            R_TRY_CATCH(eventWait(&module->event, 10'000'000)) {
-                R_CATCH(kern::ResultWaitTimeout) {
-                    continue;
-                }
-                R_CATCH(kern::ResultOperationCanceled) {
-                    break;
-                }
-            }
-            R_END_TRY_CATCH_WITH_ASSERT;
+            Result rc = eventWait(&module->event, 10'000'000);
+            if (R_VALUE(rc) == KERNELRESULT(TimedOut))
+                continue;
+            if (R_VALUE(rc) == KERNELRESULT(Cancelled))
+                break;
 
             PscPmState state;
             u32 flags;
@@ -234,7 +232,7 @@ namespace ams::tune::impl {
             if (R_SUCCEEDED(gpioPadGetValue(session, &value))) {
                 if (old_value == GpioValue_Low && value == GpioValue_High) {
                     pre_unplug_pause = should_pause;
-                    should_pause = true;
+                    should_pause     = true;
                 } else if (old_value == GpioValue_High && value == GpioValue_Low) {
                     if (!pre_unplug_pause)
                         should_pause = false;
@@ -270,7 +268,7 @@ namespace ams::tune::impl {
                     pause = true;
             }
         }
-        g_status = PlayerStatus::FetchNext;
+        g_status     = PlayerStatus::FetchNext;
         should_pause = pause;
     }
 
@@ -284,7 +282,7 @@ namespace ams::tune::impl {
                 g_queue_position = g_playlist.size() - 1;
             }
         }
-        g_status = PlayerStatus::FetchNext;
+        g_status     = PlayerStatus::FetchNext;
         should_pause = false;
     }
 
@@ -331,7 +329,7 @@ namespace ams::tune::impl {
     u32 GetCurrentPlaylist(char *buffer, size_t buffer_size) {
         std::scoped_lock lk(g_mutex);
 
-        u32 tmp = 0;
+        u32 tmp          = 0;
         size_t remaining = buffer_size / FS_MAX_PATH;
         /* Traverse playlist and write to buffer. */
         for (auto it = g_playlist.cbegin(); it != g_playlist.cend() && remaining; ++it) {
@@ -344,24 +342,24 @@ namespace ams::tune::impl {
     }
 
     Result GetCurrentQueueItem(CurrentStats *out, char *buffer, size_t buffer_size) {
-        R_UNLESS(g_source != nullptr, ResultNotPlaying());
-        R_UNLESS(g_source->IsOpen(), ResultNotPlaying());
+        R_UNLESS(g_source != nullptr, tune::NotPlaying);
+        R_UNLESS(g_source->IsOpen(), tune::NotPlaying);
 
         {
             std::scoped_lock lk(g_mutex);
-            R_UNLESS(!g_current.empty(), ResultNotPlaying());
-            R_UNLESS(buffer_size >= g_current.size(), ResultInvalidArgument());
+            R_UNLESS(!g_current.empty(), tune::NotPlaying);
+            R_UNLESS(buffer_size >= g_current.size(), tune::InvalidArgument);
             std::strcpy(buffer, g_current.c_str());
         }
 
         auto [current, total] = g_source->Tell();
-        int sample_rate = g_source->GetSampleRate();
+        int sample_rate       = g_source->GetSampleRate();
 
-        out->sample_rate = sample_rate;
+        out->sample_rate   = sample_rate;
         out->current_frame = current;
-        out->total_frames = total;
+        out->total_frames  = total;
 
-        return ResultSuccess();
+        return 0;
     }
 
     void ClearQueue() {
@@ -387,7 +385,7 @@ namespace ams::tune::impl {
         }
 
         auto source = g_playlist.cbegin() + src;
-        auto dest = g_playlist.cbegin() + dst;
+        auto dest   = g_playlist.cbegin() + dst;
 
         g_playlist.insert(dest, *source);
         g_playlist.erase(source);
@@ -436,7 +434,7 @@ namespace ams::tune::impl {
 
             g_queue_position = pos;
         }
-        g_status = PlayerStatus::FetchNext;
+        g_status     = PlayerStatus::FetchNext;
         should_pause = false;
     }
 
@@ -447,8 +445,8 @@ namespace ams::tune::impl {
 
     Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
         /* Ensure file exists. */
-        static ams::fs::FileTimeStampRaw timestamp;
-        R_TRY(fs::GetFileTimeStampRaw(&timestamp, buffer));
+        if (!sdmc::FileExists(buffer))
+            return tune::InvalidPath;
 
         std::scoped_lock lk(g_mutex);
 
@@ -459,18 +457,18 @@ namespace ams::tune::impl {
             g_playlist.emplace_back(buffer, buffer_length);
         }
         size_t shuffle_playlist_size = g_shuffle_playlist.size();
-        size_t shuffle_index = (shuffle_playlist_size > 1) ? (randomGet64() % shuffle_playlist_size) : 0;
+        size_t shuffle_index         = (shuffle_playlist_size > 1) ? (randomGet64() % shuffle_playlist_size) : 0;
         g_shuffle_playlist.emplace(g_shuffle_playlist.cbegin() + shuffle_index, buffer, buffer_length);
 
-        return ResultSuccess();
+        return 0;
     }
 
     Result Remove(u32 index) {
         std::scoped_lock lk(g_mutex);
 
         /* Ensure we don't operate out of bounds. */
-        R_UNLESS(!g_playlist.empty(), ResultQueueEmpty());
-        R_UNLESS(index < g_playlist.size(), ResultOutOfRange());
+        R_UNLESS(!g_playlist.empty(), tune::QueueEmpty);
+        R_UNLESS(index < g_playlist.size(), tune::OutOfRange);
 
         /* Get iterator for index position. */
         auto track = g_playlist.cbegin() + index;
@@ -498,7 +496,7 @@ namespace ams::tune::impl {
         if (fetch_new)
             g_status = PlayerStatus::FetchNext;
 
-        return ResultSuccess();
+        return 0;
     }
 
 }

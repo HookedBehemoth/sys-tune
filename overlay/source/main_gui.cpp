@@ -57,6 +57,9 @@ tsl::elm::Element *MainGui::createUI() {
     });
     list->addItem(browser_button);
 
+    /* Volume indicator */
+    list->addItem(this->m_volume_slider);
+
     auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
     exit_button->setClickListener([](u64 keys){
         if (keys & KEY_A) {
@@ -68,9 +71,6 @@ tsl::elm::Element *MainGui::createUI() {
         return false;
     });
     list->addItem(exit_button);
-
-    /* Volume indicator */
-    list->addItem(this->m_volume_slider);
 
     frame->setContent(list);
 

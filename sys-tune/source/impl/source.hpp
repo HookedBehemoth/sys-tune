@@ -1,18 +1,18 @@
 #pragma once
 
-#include <stratosphere.hpp>
+#include <nxExt.h>
 
 class Source {
   private:
-    ams::fs::FileHandle m_file = {};
+    FsFile m_file = {};
     s64 m_offset = 0;
     s64 m_size = 0;
 
   protected:
-    std::mutex m_mutex;
+    LockableMutex m_mutex;
 
   public:
-    Source(ams::fs::FileHandle &&file);
+    Source(FsFile &&file);
     virtual ~Source();
 
     size_t Read(void *buffer, size_t read_size);

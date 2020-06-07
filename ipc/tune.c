@@ -1,5 +1,7 @@
 #include "tune.h"
 
+#include "ipc_cmd.h"
+
 #include <string.h>
 
 Service g_tune;
@@ -29,38 +31,38 @@ void tuneExit() {
 
 Result tuneGetStatus(bool *status) {
     u8 tmp=0;
-    Result rc = serviceDispatchOut(&g_tune, 0, tmp);
+    Result rc = serviceDispatchOut(&g_tune, TuneIpcCmd_GetStatus, tmp);
     if (R_SUCCEEDED(rc) && status) *status = tmp & 1;
     return rc;
 }
 
 Result tunePlay() {
-    return serviceDispatch(&g_tune, 1);
+    return serviceDispatch(&g_tune, TuneIpcCmd_Play);
 }
 
 Result tunePause() {
-    return serviceDispatch(&g_tune, 2);
+    return serviceDispatch(&g_tune, TuneIpcCmd_Pause);
 }
 
 Result tuneNext() {
-    return serviceDispatch(&g_tune, 3);
+    return serviceDispatch(&g_tune, TuneIpcCmd_Next);
 }
 
 Result tunePrev() {
-    return serviceDispatch(&g_tune, 4);
+    return serviceDispatch(&g_tune, TuneIpcCmd_Prev);
 }
 
 Result tuneGetVolume(float *out) {
-    return serviceDispatchOut(&g_tune, 10, *out);
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetVolume, *out);
 }
 
 Result tuneSetVolume(float volume) {
-    return serviceDispatchIn(&g_tune, 11, volume);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_SetVolume, volume);
 }
 
 Result tuneGetRepeatMode(TuneRepeatMode *state) {
     u8 out = 0;
-    Result rc = serviceDispatchOut(&g_tune, 20, out);
+    Result rc = serviceDispatchOut(&g_tune, TuneIpcCmd_GetRepeatMode, out);
     if (R_SUCCEEDED(rc) && state)
         *state = out;
     return rc;
@@ -68,39 +70,39 @@ Result tuneGetRepeatMode(TuneRepeatMode *state) {
 
 Result tuneSetRepeatMode(TuneRepeatMode state) {
     u8 tmp = state;
-    return serviceDispatchIn(&g_tune, 21, tmp);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_SetRepeatMode, tmp);
 }
 
 Result tuneGetShuffleMode(TuneShuffleMode *state) {
     u8 out = 0;
-    Result rc = serviceDispatchOut(&g_tune, 22, out);
+    Result rc = serviceDispatchOut(&g_tune, TuneIpcCmd_GetShuffleMode, out);
     if (R_SUCCEEDED(rc) && state)
         *state = out;
     return rc;
 }
 Result tuneSetShuffleMode(TuneShuffleMode state) {
     u8 tmp = state;
-    return serviceDispatchIn(&g_tune, 23, tmp);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_SetShuffleMode, tmp);
 }
 
 Result tuneGetCurrentPlaylistSize(u32 *count) {
-    return serviceDispatchOut(&g_tune, 30, *count);
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetCurrentPlaylistSize, *count);
 }
 
 Result tuneGetCurrentPlaylist(u32 *read, char *out_path, size_t out_path_length) {
-    return serviceDispatchOut(&g_tune, 31, *read,
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetCurrentPlaylist, *read,
                               .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
                               .buffers = {{out_path, out_path_length}}, );
 }
 
 Result tuneGetCurrentQueueItem(char *out_path, size_t out_path_length, TuneCurrentStats *out) {
-    return serviceDispatchOut(&g_tune, 32, *out,
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetCurrentQueueItem, *out,
                               .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
                               .buffers = {{out_path, out_path_length}}, );
 }
 
 Result tuneClearQueue() {
-    return serviceDispatch(&g_tune, 33);
+    return serviceDispatch(&g_tune, TuneIpcCmd_ClearQueue);
 }
 
 Result tuneMoveQueueItem(u32 src, u32 dst) {
@@ -108,33 +110,33 @@ Result tuneMoveQueueItem(u32 src, u32 dst) {
         u32 src;
         u32 dst;
     } in = {src, dst};
-    return serviceDispatchIn(&g_tune, 34, in);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_MoveQueueItem, in);
 }
 
 Result tuneSelect(u32 index) {
-    return serviceDispatchIn(&g_tune, 35, index);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_Select, index);
 }
 
 Result tuneSeek(u32 position) {
-    return serviceDispatchIn(&g_tune, 36, position);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_Seek, position);
 }
 
 Result tuneEnqueue(const char *path, TuneEnqueueType type) {
     u8 tmp = type;
     size_t path_length = strlen(path);
-    return serviceDispatchIn(&g_tune, 40, tmp,
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_Enqueue, tmp,
                              .buffer_attrs = {SfBufferAttr_In | SfBufferAttr_HipcMapAlias},
                              .buffers = {{path, path_length}}, );
 }
 
 Result tuneRemove(u32 index) {
-    return serviceDispatchIn(&g_tune, 41, index);
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_Remove, index);
 }
 
 Result tuneQuit() {
-    return serviceDispatch(&g_tune, 50);
+    return serviceDispatch(&g_tune, TuneIpcCmd_QuitServer);
 }
 
 Result tuneGetApiVersion(u32 *version) {
-    return serviceDispatchOut(&g_tune, 5000, *version);
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetApiVersion, *version);
 }

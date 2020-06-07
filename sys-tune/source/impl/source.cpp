@@ -1,6 +1,9 @@
 #include "source.hpp"
 
+#include "sdmc.hpp"
+
 #include <cstring>
+#include <strings.h>
 
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_OGG
@@ -56,46 +59,46 @@ namespace {
         free(p);
     }
     constexpr const drflac_allocation_callbacks flac_alloc = {
-        .onMalloc = log_malloc,
+        .onMalloc  = log_malloc,
         .onRealloc = log_realloc,
-        .onFree = log_free,
+        .onFree    = log_free,
     };
     constexpr const drmp3_allocation_callbacks mp3_alloc = {
-        .onMalloc = log_malloc,
+        .onMalloc  = log_malloc,
         .onRealloc = log_realloc,
-        .onFree = log_free,
+        .onFree    = log_free,
     };
     constexpr const drwav_allocation_callbacks wav_alloc = {
-        .onMalloc = log_malloc,
+        .onMalloc  = log_malloc,
         .onRealloc = log_realloc,
-        .onFree = log_free,
+        .onFree    = log_free,
     };
     constexpr const drflac_allocation_callbacks *flac_alloc_ptr = &flac_alloc;
-    constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr = &mp3_alloc;
-    constexpr const drwav_allocation_callbacks *wav_alloc_ptr = &wav_alloc;
+    constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr   = &mp3_alloc;
+    constexpr const drwav_allocation_callbacks *wav_alloc_ptr   = &wav_alloc;
 #else
     constexpr const drflac_allocation_callbacks *flac_alloc_ptr = nullptr;
-    constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr = nullptr;
-    constexpr const drwav_allocation_callbacks *wav_alloc_ptr = nullptr;
+    constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr   = nullptr;
+    constexpr const drwav_allocation_callbacks *wav_alloc_ptr   = nullptr;
 #endif
 
 }
 
-Source::Source(ams::fs::FileHandle &&file) : m_file(file), m_offset(0), m_size(0) {
+Source::Source(FsFile &&file) : m_file(file), m_offset(0), m_size(0) {
     file = {};
-    if (R_FAILED(ams::fs::GetFileSize(&this->m_size, this->m_file)))
+    if (R_FAILED(fsFileGetSize(&this->m_file, &this->m_size)))
         this->m_size = 0;
 }
 
 Source::~Source() {
-    ams::fs::CloseFile(this->m_file);
+    fsFileClose(&this->m_file);
     this->m_offset = 0;
-    this->m_size = 0;
+    this->m_size   = 0;
 }
 
 size_t Source::Read(void *buffer, size_t read_size) {
     size_t bytes_read = 0;
-    if (R_SUCCEEDED(ams::fs::ReadFile(&bytes_read, this->m_file, this->m_offset, buffer, read_size))) {
+    if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read))) {
         this->m_offset += bytes_read;
         return bytes_read;
     } else {
@@ -127,7 +130,7 @@ class FlacFile : public Source {
     drflac *m_flac;
 
   public:
-    FlacFile(ams::fs::FileHandle &&file) : Source(std::move(file)) {
+    FlacFile(FsFile &&file) : Source(std::move(file)) {
         this->m_flac = drflac_open(ReadCallback, FlacSeekCallback, this, flac_alloc_ptr);
     }
     ~FlacFile() {
@@ -173,10 +176,10 @@ class Mp3File : public Source {
     u64 m_total_frame_count;
 
   public:
-    Mp3File(ams::fs::FileHandle &&file) : Source(std::move(file)) {
+    Mp3File(FsFile &&file) : Source(std::move(file)) {
         if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, this, mp3_alloc_ptr)) {
             this->m_total_frame_count = drmp3_get_pcm_frame_count(&this->m_mp3);
-            this->initialized = true;
+            this->initialized         = true;
         }
     }
     ~Mp3File() {
@@ -222,10 +225,10 @@ class WavFile : public Source {
     s32 m_bytes_per_pcm;
 
   public:
-    WavFile(ams::fs::FileHandle &&file) : Source(std::move(file)) {
+    WavFile(FsFile &&file) : Source(std::move(file)) {
         if (drwav_init(&this->m_wav, ReadCallback, WavSeekCallback, this, wav_alloc_ptr)) {
             this->m_bytes_per_pcm = drwav_get_bytes_per_pcm_frame(&this->m_wav);
-            this->initialized = true;
+            this->initialized     = true;
         }
     }
     ~WavFile() {
@@ -270,30 +273,30 @@ Source *OpenFile(const char *path) {
     if (length < 5)
         return nullptr;
 
-    ams::fs::FileHandle file_handle;
-    ams::Result rc = ams::fs::OpenFile(&file_handle, path, FsOpenMode_Read);
+    FsFile file;
 
-    if (R_FAILED(rc))
+    if (R_FAILED(sdmc::OpenFile(&file, path)))
         return nullptr;
 
-    auto file_guard = SCOPE_GUARD { ams::fs::CloseFile(file_handle); };
+    Source *source = nullptr;
 
-    if (false) {
-        /* stub */
 #ifdef WANT_MP3
-    } else if (strcasecmp(path + length - 4, ".mp3") == 0) {
-        file_guard.Cancel();
-        return new (std::nothrow) Mp3File(std::move(file_handle));
+    if (strcasecmp(path + length - 4, ".mp3") == 0) {
+        source = new (std::nothrow) Mp3File(std::move(file));
+    } else
 #endif
 #ifdef WANT_FLAC
-    } else if (strcasecmp(path + length - 5, ".flac") == 0) {
-        return new (std::nothrow) FlacFile(std::move(file_handle));
+        if (strcasecmp(path + length - 5, ".flac") == 0) {
+        source = new (std::nothrow) FlacFile(std::move(file));
+    } else
 #endif
 #ifdef WANT_WAV
-    } else if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
-        return new (std::nothrow) WavFile(std::move(file_handle));
-#endif
-    } else {
-        return nullptr;
+        if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
+        source = new (std::nothrow) WavFile(std::move(file));
     }
+#endif
+    if (source == nullptr)
+        fsFileClose(&file);
+
+    return source;
 }

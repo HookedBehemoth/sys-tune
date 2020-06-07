@@ -98,7 +98,7 @@ void BrowserGui::scanCwd() {
             auto *item = new tsl::elm::ListItem(elm.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
-                    std::sprintf(path_buffer, "sdmc:%s%s", this->cwd, item->getText().c_str());
+                    std::sprintf(path_buffer, "%s%s", this->cwd, item->getText().c_str());
                     auto rc = tuneEnqueue(path_buffer, TuneEnqueueType_Last);
                     printf("enqueue 0x%x\n", rc);
                     return true;
