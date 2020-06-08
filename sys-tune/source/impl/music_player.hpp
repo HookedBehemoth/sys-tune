@@ -35,8 +35,8 @@ namespace tune::impl {
     ShuffleMode GetShuffleMode();
     void SetShuffleMode(ShuffleMode mode);
 
-    u32 GetCurrentPlaylistSize();
-    u32 GetCurrentPlaylist(char* buffer, size_t buffer_size);
+    u32 GetPlaylistSize();
+    u32 GetPlaylistItem(u32 index, char* buffer, size_t buffer_size);
     Result GetCurrentQueueItem(CurrentStats *out, char* buffer, size_t buffer_size);
     void ClearQueue();
     void MoveQueueItem(u32 src, u32 dst);

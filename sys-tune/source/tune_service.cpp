@@ -69,16 +69,15 @@ namespace tune {
                 case TuneIpcCmd_SetShuffleMode:
                     SET_SINGLE(ShuffleMode, impl::SetShuffleMode);
 
-                case TuneIpcCmd_GetCurrentPlaylistSize:
-                    GET_SINGLE(u32, impl::GetCurrentPlaylistSize);
+                case TuneIpcCmd_GetPlaylistSize:
+                    GET_SINGLE(u32, impl::GetPlaylistSize);
 
-                case TuneIpcCmd_GetCurrentPlaylist:
-                    if (r->hipc.meta.num_recv_buffers >= 1) {
-                        *out_dataSize    = sizeof(u32);
-                        *(u32 *)out_data = impl::GetCurrentPlaylist(
+                case TuneIpcCmd_GetPlaylistItem:
+                    if (r->hipc.meta.num_recv_buffers >= 1 && r->data.size >= sizeof(u32)) {
+                        return impl::GetPlaylistItem(
+                            *(u32 *)r->data.ptr,
                             (char *)hipcGetBufferAddress(r->hipc.data.recv_buffers),
                             hipcGetBufferSize(r->hipc.data.recv_buffers));
-                        return 0;
                     }
                     break;
 

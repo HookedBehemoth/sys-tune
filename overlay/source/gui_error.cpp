@@ -1,4 +1,4 @@
-#include "error_gui.hpp"
+#include "gui_error.hpp"
 
 static char result_buffer[10];
 

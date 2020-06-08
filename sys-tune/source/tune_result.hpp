@@ -39,17 +39,3 @@ namespace tune {
         if (R_FAILED(tmp_res))     \
             fatalThrow(tmp_res);   \
     })
-
-#ifndef RELEASE
-
-#ifdef SYS
-#define LOG(fmt, ...)
-#endif /* SYS */
-
-#ifdef APPLET
-#define LOG(fmt, ...) std::printf(fmt, __VA_ARGS__);
-#endif /* APPLET */
-
-#else
-#define LOG(fmt, ...)
-#endif

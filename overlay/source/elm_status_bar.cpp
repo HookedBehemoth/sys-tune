@@ -1,4 +1,4 @@
-#include "status_bar.hpp"
+#include "elm_status_bar.hpp"
 
 #include "symbol.hpp"
 
@@ -21,8 +21,7 @@ namespace {
 
 }
 
-StatusBar::StatusBar()
-    : m_playing(false), m_percentage(0.0), m_text_width(), m_truncated(false), m_scroll_offset(0), m_counter(0) {
+StatusBar::StatusBar() {
     if (R_FAILED(tuneGetRepeatMode(&this->m_repeat)))
         this->m_repeat = TuneRepeatMode_Off;
     if (R_FAILED(tuneGetShuffleMode(&this->m_shuffle)))

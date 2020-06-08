@@ -18,8 +18,8 @@ typedef enum {
 } TuneRepeatMode;
 
 typedef enum {
-    TuneEnqueueType_Next,
-    TuneEnqueueType_Last,
+    TuneEnqueueType_Front,
+    TuneEnqueueType_Back,
 } TuneEnqueueType;
 
 typedef struct {
@@ -76,7 +76,7 @@ Result tuneSetShuffleMode(TuneShuffleMode state);
  * @brief Get the current queue size.
  * @param[out] count remaining tracks after current.
  */
-Result tuneGetCurrentPlaylistSize(u32 *count);
+Result tuneGetPlaylistSize(u32 *count);
 
 /**
  * @brief Read queue.
@@ -84,7 +84,7 @@ Result tuneGetCurrentPlaylistSize(u32 *count);
  * @param[out] out_path Path array FS_MAX_PATH * n
  * @param[in] out_path_length Size of the supplied path array.
  */
-Result tuneGetCurrentPlaylist(u32 *read, char *out_path, size_t out_path_length);
+Result tuneGetPlaylistItem(u32 index, char *out_path, size_t out_path_length);
 
 /**
  * @brief Get current song.

@@ -15,8 +15,8 @@ enum TuneIpcCmd {
     TuneIpcCmd_GetShuffleMode = 22,
     TuneIpcCmd_SetShuffleMode = 23,
 
-    TuneIpcCmd_GetCurrentPlaylistSize = 30,
-    TuneIpcCmd_GetCurrentPlaylist = 31,
+    TuneIpcCmd_GetPlaylistSize = 30,
+    TuneIpcCmd_GetPlaylistItem = 31,
     TuneIpcCmd_GetCurrentQueueItem = 32,
     TuneIpcCmd_ClearQueue = 33,
     TuneIpcCmd_MoveQueueItem = 34,

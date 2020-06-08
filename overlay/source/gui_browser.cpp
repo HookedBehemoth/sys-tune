@@ -1,7 +1,6 @@
-#include "browser_gui.hpp"
+#include "gui_browser.hpp"
 
-#include "../../ipc/tune.h"
-#include "list_items.hpp"
+#include "tune.h"
 
 namespace {
 
@@ -9,7 +8,7 @@ namespace {
         return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
     };
 
-    ALWAYS_INLINE bool EndsWith(const char* name, const char *ext) {
+    ALWAYS_INLINE bool EndsWith(const char *name, const char *ext) {
         return strcasecmp(name + std::strlen(name) - std::strlen(ext), ext) == 0;
     }
 
@@ -23,18 +22,25 @@ BrowserGui::BrowserGui()
     this->m_list = new tsl::elm::List();
 
     /* Open sd card filesystem. */
-    Result rc = this->m_fs.OpenSdCardFileSystem();
+    Result rc = fsOpenSdCardFileSystem(&this->m_fs);
     if (R_SUCCEEDED(rc)) {
         /* Check if base path /music/ exists. */
-        fs::IDirectory dir;
-        if (R_SUCCEEDED(this->m_fs.OpenDirectoryFormat(&dir, FsDirOpenMode_ReadFiles, base_path))) {
-            std::strcpy(this->cwd, base_path);
+        FsDir dir;
+        std::strcpy(this->cwd, base_path);
+        if (R_SUCCEEDED(fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadFiles, &dir))) {
             this->has_music = true;
+            fsDirClose(&dir);
+        } else {
+            this->cwd[0] = '\0';
         }
         this->scanCwd();
     } else {
-        this->m_list->addItem(new tsl::elm::CategoryHeader("Couldn't open SdCard filesystem"));
+        this->m_list->addItem(new tsl::elm::CategoryHeader("Couldn't open SdCard"));
     }
+}
+
+BrowserGui::~BrowserGui() {
+    fsFsClose(&this->m_fs);
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
@@ -67,8 +73,8 @@ void BrowserGui::scanCwd() {
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
 
     /* Open directory. */
-    fs::IDirectory dir;
-    Result rc = this->m_fs.OpenDirectory(&dir, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, this->cwd);
+    FsDir dir;
+    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, &dir);
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -80,10 +86,12 @@ void BrowserGui::scanCwd() {
     std::vector<tsl::elm::ListItem *> folders, files;
 
     /* Iternate over directory. */
-    for (const auto &elm : fs::DirectoryIterator(&dir)) {
-        if (elm.type == FsDirEntryType_Dir) {
+    s64 count = 0;
+    FsDirectoryEntry entry;
+    while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count) {
+        if (entry.type == FsDirEntryType_Dir) {
             /* Add directory entries. */
-            auto *item = new tsl::elm::ListItem(elm.name);
+            auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
                     std::sprintf(this->cwd, "%s%s/", this->cwd, item->getText().c_str());
@@ -93,14 +101,13 @@ void BrowserGui::scanCwd() {
                 return false;
             });
             folders.push_back(item);
-        } else if (EndsWith(elm.name, ".mp3") || EndsWith(elm.name, ".wav") || EndsWith(elm.name, ".wave") || EndsWith(elm.name, ".flac")) {
+        } else if (EndsWith(entry.name, ".mp3") || EndsWith(entry.name, ".wav") || EndsWith(entry.name, ".wave") || EndsWith(entry.name, ".flac")) {
             /* Add file entry. */
-            auto *item = new tsl::elm::ListItem(elm.name);
+            auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & KEY_A) {
                     std::sprintf(path_buffer, "%s%s", this->cwd, item->getText().c_str());
-                    auto rc = tuneEnqueue(path_buffer, TuneEnqueueType_Last);
-                    printf("enqueue 0x%x\n", rc);
+                    tuneEnqueue(path_buffer, TuneEnqueueType_Back);
                     return true;
                 }
                 return false;

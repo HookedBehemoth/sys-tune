@@ -1,38 +1,17 @@
 #define TESLA_INIT_IMPL
-#include "../../ipc/tune.h"
-#include "error_gui.hpp"
-#include "main_gui.hpp"
+#include "tune.h"
+#include "gui_error.hpp"
+#include "gui_main.hpp"
 
 #include <tesla.hpp>
-
-constexpr const SocketInitConfig sockConf = {
-    .bsdsockets_version = 1,
-
-    .tcp_tx_buf_size     = 0x800,
-    .tcp_rx_buf_size     = 0x800,
-    .tcp_tx_buf_max_size = 0x25000,
-    .tcp_rx_buf_max_size = 0x25000,
-
-    .udp_tx_buf_size = 0x800,
-    .udp_rx_buf_size = 0x800,
-
-    .sb_efficiency = 1,
-
-    .num_bsd_sessions = 0,
-    .bsd_service_type = BsdServiceType_Auto,
-};
 
 class OverlayTest : public tsl::Overlay {
   private:
     const char *msg = nullptr;
     Result fail     = 0;
-    int nxlink;
 
   public:
     virtual void initServices() override {
-        socketInitialize(&sockConf);
-        nxlink = nxlinkStdio();
-
         Result rc = tuneInitialize();
 
         if (rc == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
@@ -67,8 +46,6 @@ class OverlayTest : public tsl::Overlay {
     }
     virtual void exitServices() override {
         tuneExit();
-        ::close(nxlink);
-        socketExit();
     }
 
     virtual void onShow() override {}

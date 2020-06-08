@@ -1,6 +1,6 @@
 export GITHASH := $(shell git rev-parse --short HEAD)
 export VERSION := 1.2.0
-export API_VERSION := 2
+export API_VERSION := 3
 
 all: overlay nxExt module
 

@@ -17,8 +17,8 @@ class StatusBar : public tsl::elm::Element {
     std::string_view m_current_track;
     std::string m_scroll_text;
     u32 m_text_width;
-    bool m_truncated;
     u32 m_scroll_offset;
+    bool m_truncated;
     u8 m_counter;
 
     bool m_touched = false;
@@ -26,11 +26,11 @@ class StatusBar : public tsl::elm::Element {
   public:
     StatusBar();
 
-    virtual tsl::elm::Element *requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) override;
-    virtual void draw(tsl::gfx::Renderer *renderer) override;
-    virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override;
-    virtual bool onClick(u64 keys) override;
-    virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override;
+    virtual tsl::elm::Element *requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) final;
+    virtual void draw(tsl::gfx::Renderer *renderer) final;
+    virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) final;
+    virtual bool onClick(u64 keys) final;
+    virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) final;
 
     void update();
 

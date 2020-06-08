@@ -2,7 +2,7 @@
 
 #include <tesla.hpp>
 
-class ErrorGui : public tsl::Gui {
+class ErrorGui final : public tsl::Gui {
   private:
     const char *m_msg    = nullptr;
     const char *m_result = nullptr;
@@ -11,5 +11,5 @@ class ErrorGui : public tsl::Gui {
   public:
     ErrorGui(const char *msg, Result rc);
 
-    virtual tsl::elm::Element *createUI() override;
+    virtual tsl::elm::Element *createUI() final;
 };

@@ -1,13 +1,8 @@
-#include "playlist_gui.hpp"
+#include "gui_playlist.hpp"
 
-#include "../../ipc/tune.h"
-#include "list_items.hpp"
+#include "tune.h"
 
 namespace {
-
-    constexpr const u32 queue_count = 30;
-    constexpr const size_t queue_size = 30 * FS_MAX_PATH;
-    char queue_buffer[queue_size];
 
     void NullLastDot(char *str) {
         char *end = str + strlen(str) - 1;
@@ -20,14 +15,43 @@ namespace {
         }
     }
 
+    class ButtonListItem : public tsl::elm::ListItem {
+      public:
+        template <typename Text, typename Value>
+        ButtonListItem(Text &text, Value &value) : ListItem(std::forward<Text>(text), std::forward<Value>(value)) {}
+
+        virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+            if (event == tsl::elm::TouchEvent::Touch)
+                this->m_touched = this->inBounds(currX, currY);
+
+            if (event == tsl::elm::TouchEvent::Release && this->m_touched) {
+                this->m_touched = false;
+
+                if (Element::getInputMode() == tsl::InputMode::Touch) {
+                    bool handled = false;
+                    if (currX > this->getLeftBound() && currX < (this->getRightBound() - this->getHeight()) && currY > this->getTopBound() && currY < this->getBottomBound())
+                        handled = this->onClick(KEY_A);
+
+                    if (currX > (this->getRightBound() - this->getHeight()) && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound())
+                        handled = this->onClick(KEY_Y);
+
+                    this->m_clickAnimationProgress = 0;
+                    return handled;
+                }
+            }
+
+            return false;
+        }
+    };
+
 }
 
 PlaylistGui::PlaylistGui() {
     m_list = new tsl::elm::List();
 
     u32 count;
-    Result rc = tuneGetCurrentPlaylist(&count, queue_buffer, queue_size);
-    if (R_FAILED(rc)){
+    Result rc = tuneGetPlaylistSize(&count);
+    if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
         this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
@@ -40,20 +64,24 @@ PlaylistGui::PlaylistGui() {
         return;
     }
 
-    char *ptr = queue_buffer;
-    for (u32 i = 0; i < std::min(count, queue_count); i++) {
-        const char *str = ptr;
-        size_t length = std::strlen(ptr);
-        NullLastDot(ptr);
+    char path[FS_MAX_PATH];
+    for (u32 i = 0; i < count; i++) {
+        rc = tuneGetPlaylistItem(i, path, FS_MAX_PATH);
+        if (R_FAILED(rc))
+            break;
+
+        char *str = path;
+        size_t length   = std::strlen(str);
+        NullLastDot(str);
         for (size_t i = length; i >= 0; i--) {
-            if (ptr[i] == '/') {
-                str = ptr + i + 1;
+            if (str[i] == '/') {
+                str = str + i + 1;
                 break;
             }
         }
         auto *item = new ButtonListItem(str, "\uE098");
         item->setClickListener([this, item](u64 keys) -> bool {
-            u32 index = this->m_list->getIndexInList(item);
+            u32 index  = this->m_list->getIndexInList(item);
             u8 counter = 0;
             if (keys & KEY_A) {
                 tuneSelect(index);
@@ -79,7 +107,6 @@ PlaylistGui::PlaylistGui() {
             return counter;
         });
         m_list->addItem(item);
-        ptr += FS_MAX_PATH;
     }
 }
 
@@ -89,11 +116,4 @@ tsl::elm::Element *PlaylistGui::createUI() {
     rootFrame->setContent(this->m_list);
 
     return rootFrame;
-}
-
-void PlaylistGui::update() {
-}
-
-bool PlaylistGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
-    return false;
 }

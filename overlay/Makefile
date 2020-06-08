@@ -41,7 +41,7 @@ APP_TITLE	:=	sys-tune overlay
 
 TARGET		:=	sys-tune-overlay
 BUILD		:=	build
-SOURCES		:=	source source/hos/fs ../ipc
+SOURCES		:=	source ../ipc
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc
 APP_VERSION	:=	$(VERSION)
@@ -194,8 +194,6 @@ $(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp
 	@echo "built ... $(notdir $(OUTPUT).ovl)"
 
 $(OUTPUT).elf	:	$(OFILES)
-
-$(OFILES)		:	$(CURDIR)/../lib/include/tesla.hpp.gch
 
 $(OFILES_SRC)	: $(HFILES_BIN)
 

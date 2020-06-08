@@ -85,12 +85,12 @@ Result tuneSetShuffleMode(TuneShuffleMode state) {
     return serviceDispatchIn(&g_tune, TuneIpcCmd_SetShuffleMode, tmp);
 }
 
-Result tuneGetCurrentPlaylistSize(u32 *count) {
-    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetCurrentPlaylistSize, *count);
+Result tuneGetPlaylistSize(u32 *count) {
+    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetPlaylistSize, *count);
 }
 
-Result tuneGetCurrentPlaylist(u32 *read, char *out_path, size_t out_path_length) {
-    return serviceDispatchOut(&g_tune, TuneIpcCmd_GetCurrentPlaylist, *read,
+Result tuneGetPlaylistItem(u32 index, char *out_path, size_t out_path_length) {
+    return serviceDispatchIn(&g_tune, TuneIpcCmd_GetPlaylistItem, index,
                               .buffer_attrs = {SfBufferAttr_Out | SfBufferAttr_HipcMapAlias},
                               .buffers = {{out_path, out_path_length}}, );
 }

@@ -1,7 +1,7 @@
-#include "main_gui.hpp"
+#include "gui_main.hpp"
 
-#include "browser_gui.hpp"
-#include "playlist_gui.hpp"
+#include "gui_browser.hpp"
+#include "gui_playlist.hpp"
 
 namespace {
 
@@ -16,7 +16,7 @@ namespace {
 }
 
 MainGui::MainGui() {
-    m_status_bar = new StatusBar();
+    m_status_bar    = new StatusBar();
     m_volume_slider = new tsl::elm::StepTrackBar("\uE13C", num_steps);
     /* Get initial volume. */
     float volume = 0;
@@ -30,7 +30,7 @@ MainGui::MainGui() {
 
 tsl::elm::Element *MainGui::createUI() {
     auto *frame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
-    auto *list = new tsl::elm::List();
+    auto *list  = new tsl::elm::List();
 
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
@@ -61,10 +61,9 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(this->m_volume_slider);
 
     auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
-    exit_button->setClickListener([](u64 keys){
+    exit_button->setClickListener([](u64 keys) {
         if (keys & KEY_A) {
-            auto rc = tuneQuit();
-            printf("Quit: 0x%x\n", rc);
+            tuneQuit();
             tsl::goBack();
             return true;
         }

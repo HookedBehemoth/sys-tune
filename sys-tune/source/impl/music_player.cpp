@@ -1,6 +1,6 @@
 #include "music_player.hpp"
 
-#include "../tune_result.hpp"
+#include "tune_result.hpp"
 #include "sdmc.hpp"
 #include "source.hpp"
 
@@ -27,11 +27,14 @@ namespace tune::impl {
         PlayerStatus g_status = PlayerStatus::FetchNext;
 
         AudioDriver g_drv;
-        u8 *audMemPool                      = nullptr;
         constexpr const int MinSampleCount  = 256;
         constexpr const int MaxChannelCount = 8;
         constexpr const int BufferCount     = 2;
         constexpr const int AudioSampleSize = MinSampleCount * MaxChannelCount * sizeof(s16);
+        constexpr const int AudioPoolSize = AudioSampleSize * BufferCount;
+        alignas(0x1000) u8 AudioMemoryPool[AudioPoolSize];
+
+        static_assert((sizeof(AudioMemoryPool) % 0x1000) == 0, "Audio Memory pool needs to be page aligned!");
 
         bool should_pause = false;
         bool should_run   = true;
@@ -57,7 +60,7 @@ namespace tune::impl {
             AudioDriverWaveBuf buffers[2] = {};
 
             for (int i = 0; i < 2; i++) {
-                buffers[i].data_pcm16          = (s16 *)audMemPool;
+                buffers[i].data_pcm16          = reinterpret_cast<s16 *>(&AudioMemoryPool);
                 buffers[i].size                = AudioSampleSize;
                 buffers[i].start_sample_offset = i * sample_count;
                 buffers[i].end_sample_offset   = buffers[i].start_sample_offset + sample_count;
@@ -80,7 +83,7 @@ namespace tune::impl {
                 }
 
                 if (refillBuf) {
-                    s16 *data = (s16 *)audMemPool + refillBuf->start_sample_offset * 2;
+                    s16 *data = reinterpret_cast<s16 *>(&AudioMemoryPool) + refillBuf->start_sample_offset * 2;
 
                     int nSamples = source->Decode(sample_count, data);
 
@@ -111,34 +114,28 @@ namespace tune::impl {
 
     Result Initialize() {
         /* Create audio driver. */
-        R_TRY(audrvCreate(&g_drv, &audren_cfg, 2));
-        ScopeGuard audrv_guard([] { audrvClose(&g_drv); });
+        Result rc = audrvCreate(&g_drv, &audren_cfg, 2);
+        if (R_SUCCEEDED(rc)) {
+            /* Register memory pool. */
+            int mpid = audrvMemPoolAdd(&g_drv, AudioMemoryPool, AudioPoolSize);
+            audrvMemPoolAttach(&g_drv, mpid);
 
-        /* Align memory pool size. */
-        const int poolSize = (AudioSampleSize * BufferCount + (AUDREN_MEMPOOL_ALIGNMENT - 1)) & ~(AUDREN_MEMPOOL_ALIGNMENT - 1);
+            /* Attach default sink. */
+            u8 sink_channels[] = {0, 1};
+            audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
 
-        /* Allocate memory aligned. */
-        audMemPool = new (std::align_val_t(AUDREN_MEMPOOL_ALIGNMENT), std::nothrow) u8[poolSize];
-        if (audMemPool == nullptr)
-            return tune::OutOfMemory;
-        ScopeGuard buffer_guard([] { delete[] audMemPool; audMemPool = nullptr; });
+            rc = audrvUpdate(&g_drv);
+            if (R_SUCCEEDED(rc)) {
+                rc = audrenStartAudioRenderer();
+                if (R_SUCCEEDED(rc))
+                    return 0;
+            } else {
+                /* Cleanup on failure */
+                audrvClose(&g_drv);
+            }
+        }
 
-        /* Register memory pool. */
-        int mpid = audrvMemPoolAdd(&g_drv, audMemPool, poolSize);
-        audrvMemPoolAttach(&g_drv, mpid);
-
-        /* Attach default sink. */
-        u8 sink_channels[] = {0, 1};
-        audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
-        R_TRY(audrvUpdate(&g_drv));
-
-        R_TRY(audrenStartAudioRenderer());
-
-        /* Dismiss our safety guards as everything succeeded. */
-        buffer_guard.dismiss();
-        audrv_guard.dismiss();
-
-        return 0;
+        return rc;
     }
 
     void Exit() {
@@ -170,8 +167,6 @@ namespace tune::impl {
                 continue;
             }
 
-            LOG("Index: %d, track: %s\n", g_queue_position, g_current.c_str());
-
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
             Result rc = PlayTrack(g_current);
@@ -185,12 +180,9 @@ namespace tune::impl {
                 Remove(g_queue_position);
                 if (shuffle)
                     SetShuffleMode(ShuffleMode::On);
-
-                LOG("error: 0x%x, 2%03d-%04d\n", rc.GetValue(), rc.GetModule(), rc.GetDescription());
             }
         }
 
-        delete[] audMemPool;
         audrvClose(&g_drv);
     }
 
@@ -320,25 +312,21 @@ namespace tune::impl {
         g_shuffle = mode;
     }
 
-    u32 GetCurrentPlaylistSize() {
+    u32 GetPlaylistSize() {
         std::scoped_lock lk(g_mutex);
 
         return g_playlist.size();
     }
 
-    u32 GetCurrentPlaylist(char *buffer, size_t buffer_size) {
+    Result GetPlaylistItem(u32 index, char *buffer, size_t buffer_size) {
         std::scoped_lock lk(g_mutex);
 
-        u32 tmp          = 0;
-        size_t remaining = buffer_size / FS_MAX_PATH;
-        /* Traverse playlist and write to buffer. */
-        for (auto it = g_playlist.cbegin(); it != g_playlist.cend() && remaining; ++it) {
-            std::strncpy(buffer, it->c_str(), FS_MAX_PATH);
-            buffer += FS_MAX_PATH;
-            remaining--;
-            tmp++;
-        }
-        return tmp;
+        if (index >= g_playlist.size())
+            return tune::OutOfRange;
+
+        strncpy(buffer, g_playlist[index].c_str(), buffer_size);
+
+        return 0;
     }
 
     Result GetCurrentQueueItem(CurrentStats *out, char *buffer, size_t buffer_size) {
@@ -450,7 +438,7 @@ namespace tune::impl {
 
         std::scoped_lock lk(g_mutex);
 
-        if (type == EnqueueType::Next) {
+        if (type == EnqueueType::Front) {
             g_playlist.emplace(g_playlist.cbegin(), buffer, buffer_length);
             g_queue_position++;
         } else {
