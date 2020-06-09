@@ -1,5 +1,6 @@
 #include "source.hpp"
 
+#include "nx_hwopus.hpp"
 #include "sdmc.hpp"
 
 #include <cstring>
@@ -21,7 +22,7 @@
 
 namespace {
 
-    size_t ReadCallback(void *pUserData, void *pBufferOut, size_t bytesToRead) {
+    size_t DrReadCallback(void *pUserData, void *pBufferOut, size_t bytesToRead) {
         auto data = static_cast<Source *>(pUserData);
 
         return data->Read(pBufferOut, bytesToRead);
@@ -30,20 +31,45 @@ namespace {
     drflac_bool32 FlacSeekCallback(void *pUserData, int offset, drflac_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drflac_seek_origin_start);
+        return data->Seek(offset, origin);
     }
 
     drmp3_bool32 Mp3SeekCallback(void *pUserData, int offset, drmp3_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drmp3_seek_origin_start);
+        return data->Seek(offset, origin);
     }
 
     drwav_bool32 WavSeekCallback(void *pUserData, int offset, drwav_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drwav_seek_origin_start);
+        return data->Seek(offset, origin);
     }
+
+    int OpusReadCallback(void *pUserData, unsigned char *pBufferOut, int bytesToRead) {
+        auto data = static_cast<Source *>(pUserData);
+
+        return data->Read(pBufferOut, bytesToRead);
+    }
+
+    int OpusSeekCallback(void *pUserData, opus_int64 offset, int whence) {
+        auto data = static_cast<Source *>(pUserData);
+
+        return data->Seek(offset, whence);
+    }
+
+    opus_int64 OpusTellCallback(void *pUserData) {
+        auto data = static_cast<Source *>(pUserData);
+
+        return data->m_offset;
+    }
+
+    constexpr const OpusFileCallbacks opus_ioctl{
+        .read  = OpusReadCallback,
+        .seek  = OpusSeekCallback,
+        .tell  = OpusTellCallback,
+        .close = nullptr,
+    };
 
 #ifdef DEBUG
     void *log_malloc(size_t sz, void *) {
@@ -84,13 +110,16 @@ namespace {
 
 }
 
-Source::Source(FsFile &&file) : m_file(file), m_offset(0), m_size(0) {
+Source::Source(FsFile &&file) : m_file(file) {
+    log = fopen("sdmc:/log", "w+a");
     file = {};
     if (R_FAILED(fsFileGetSize(&this->m_file, &this->m_size)))
         this->m_size = 0;
 }
 
 Source::~Source() {
+    if (log)
+        fclose(log);
     fsFileClose(&this->m_file);
     this->m_offset = 0;
     this->m_size   = 0;
@@ -98,23 +127,39 @@ Source::~Source() {
 
 size_t Source::Read(void *buffer, size_t read_size) {
     size_t bytes_read = 0;
-    if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read))) {
+    Result rc = fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read);
+    if (R_SUCCEEDED(rc)) {
         this->m_offset += bytes_read;
         return bytes_read;
     } else {
+        fprintf(log, "read: 0x%x\n", rc);
         return 0;
     }
 }
 
-bool Source::Seek(int offset, bool set) {
-    s64 absolute = offset;
-    if (!set)
-        absolute += this->m_offset;
+bool Source::Seek(int offset, int whence) {
+    s64 absolute = 0;
 
-    if (absolute < this->m_size) {
+    switch (whence) {
+        case SEEK_SET:
+            absolute = offset;
+            break;
+        case SEEK_CUR:
+            absolute = this->m_offset + offset;
+            break;
+        case SEEK_END:
+            absolute = this->m_size - (offset + 1);
+            break;
+        default:
+            fprintf(log, "whence: %d\n", whence);
+            return false;
+    }
+
+    if (absolute >= 0 && absolute < this->m_size) {
         this->m_offset = absolute;
         return true;
     } else {
+        fprintf(log, "seek: %ld/%ld\n", absolute, this->m_size);
         return false;
     }
 }
@@ -131,8 +176,9 @@ class FlacFile : public Source {
 
   public:
     FlacFile(FsFile &&file) : Source(std::move(file)) {
-        this->m_flac = drflac_open(ReadCallback, FlacSeekCallback, this, flac_alloc_ptr);
+        this->m_flac = drflac_open(DrReadCallback, FlacSeekCallback, this, flac_alloc_ptr);
     }
+
     ~FlacFile() {
         if (this->m_flac != nullptr)
             drflac_close(this->m_flac);
@@ -177,7 +223,7 @@ class Mp3File : public Source {
 
   public:
     Mp3File(FsFile &&file) : Source(std::move(file)) {
-        if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, this, mp3_alloc_ptr)) {
+        if (drmp3_init(&this->m_mp3, DrReadCallback, Mp3SeekCallback, this, mp3_alloc_ptr)) {
             this->m_total_frame_count = drmp3_get_pcm_frame_count(&this->m_mp3);
             this->initialized         = true;
         }
@@ -226,7 +272,7 @@ class WavFile : public Source {
 
   public:
     WavFile(FsFile &&file) : Source(std::move(file)) {
-        if (drwav_init(&this->m_wav, ReadCallback, WavSeekCallback, this, wav_alloc_ptr)) {
+        if (drwav_init(&this->m_wav, DrReadCallback, WavSeekCallback, this, wav_alloc_ptr)) {
             this->m_bytes_per_pcm = drwav_get_bytes_per_pcm_frame(&this->m_wav);
             this->initialized     = true;
         }
@@ -268,6 +314,79 @@ class WavFile : public Source {
     }
 };
 
+class OpusFile : public Source {
+  private:
+    OggOpusFile *m_opus;
+    HwopusDecoder decoder;
+    bool has_memory;
+    Result decoder_rc;
+    int m_channel_count;
+
+  public:
+    OpusFile(FsFile &&file) : Source(std::move(file)) {
+        int err = 0;
+        this->m_opus = op_open_callbacks(this, &opus_ioctl, nullptr, 0, &err);
+        if (this->m_opus != nullptr) {
+            op_set_decode_callback(this->m_opus, hwopus::OpusDecodeCallback, &this->decoder);
+            this->m_channel_count = op_channel_count(this->m_opus, -1);
+        } else {
+            fprintf(log, "open: %d\n", err);
+        }
+        has_memory = hwopus::Allocate();
+        smInitialize();
+        decoder_rc = hwopusDecoderInitialize(&this->decoder, this->GetSampleRate(), this->GetChannelCount());
+        smExit();
+        fprintf(this->log, "opus: %p, mem: %d, hw: 0x%x\n", m_opus, has_memory, decoder_rc);
+    }
+
+    ~OpusFile() {
+        if (this->m_opus != nullptr)
+            op_free(this->m_opus);
+        if (has_memory)
+            hwopus::Free();
+        if (R_SUCCEEDED(decoder_rc))
+            hwopusDecoderExit(&this->decoder);
+    }
+
+    bool IsOpen() {
+        return (this->m_opus != nullptr) && has_memory && (R_SUCCEEDED(decoder_rc));
+    }
+
+    size_t Decode(size_t sample_count, s16 *data) {
+        std::scoped_lock lk(this->m_mutex);
+
+        size_t buffer_size = sample_count * this->m_channel_count;
+        int opret = op_read(this->m_opus, data, buffer_size, nullptr);
+
+        if (opret < 0) {
+            fprintf(log, "op_read: %d\n", opret);
+            opret = 0;
+        }
+
+        return opret;
+    }
+
+    std::pair<u32, u32> Tell() {
+        std::scoped_lock lk(this->m_mutex);
+
+        return {op_pcm_tell(this->m_opus), op_pcm_total(this->m_opus, -1)};
+    }
+
+    bool Seek(u64 target) {
+        std::scoped_lock lk(this->m_mutex);
+
+        return op_pcm_seek(this->m_opus, target);
+    }
+
+    int GetSampleRate() {
+        return 48'000;
+    }
+
+    int GetChannelCount() {
+        return this->m_channel_count;
+    }
+};
+
 Source *OpenFile(const char *path) {
     size_t length = std::strlen(path);
     if (length < 5)
@@ -280,21 +399,28 @@ Source *OpenFile(const char *path) {
 
     Source *source = nullptr;
 
+    if (false) {}
 #ifdef WANT_MP3
-    if (strcasecmp(path + length - 4, ".mp3") == 0) {
+    else if (strcasecmp(path + length - 4, ".mp3") == 0) {
         source = new (std::nothrow) Mp3File(std::move(file));
-    } else
+    }
 #endif
 #ifdef WANT_FLAC
-        if (strcasecmp(path + length - 5, ".flac") == 0) {
+    else if (strcasecmp(path + length - 5, ".flac") == 0) {
         source = new (std::nothrow) FlacFile(std::move(file));
-    } else
+    }
 #endif
 #ifdef WANT_WAV
-        if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
+    else if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
         source = new (std::nothrow) WavFile(std::move(file));
     }
 #endif
+#ifdef WANT_OPUS
+    else if (strcasecmp(path + length - 5, ".opus") == 0) {
+        source = new (std::nothrow) OpusFile(std::move(file));
+    }
+#endif
+
     if (source == nullptr)
         fsFileClose(&file);
 

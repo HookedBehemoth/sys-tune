@@ -17,6 +17,7 @@ namespace {
         ".flac",
         ".wav",
         ".wave",
+        ".opus",
     };
 
     bool SupportsType(const char* name) {

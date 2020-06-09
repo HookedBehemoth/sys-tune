@@ -52,14 +52,14 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE -DWANT_FLAC -DWANT_MP3 -DWANT_WAV
+CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE -DWANT_FLAC -DWANT_MP3 -DWANT_WAV -DWANT_OPUS `aarch64-none-elf-pkg-config --cflags opusfile`
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lnx -lnxExt
+LIBS	:= -lnx -lnxExt `aarch64-none-elf-pkg-config --libs opusfile`
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

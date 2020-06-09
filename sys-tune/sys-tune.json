@@ -78,6 +78,8 @@
 				"svcReplyAndReceive":	"0x43",
 				"svcReplyAndReceiveWithUserBuffer":	"0x44",
 				"svcCreateEvent":	"0x45",
+				"svcMapTransferMemory":	"0x51",
+				"svcUnmapTransferMemory":	"0x52",
                 "svcGetSystemInfo":    "0x6f",
                 "svcCallSecureMonitor": "0x7f"
 			}
