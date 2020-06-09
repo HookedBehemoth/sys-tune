@@ -13,13 +13,19 @@ namespace {
     }
 
     constexpr const std::array SupportedTypes = {
+#ifdef WANT_MP3
         ".mp3",
+#endif
+#ifdef WANT_FLAC
         ".flac",
+#endif
+#ifdef WANT_WAV
         ".wav",
         ".wave",
+#endif
     };
 
-    bool SupportsType(const char* name) {
+    bool SupportsType(const char *name) {
         for (auto &ext : SupportedTypes)
             if (EndsWith(name, ext))
                 return true;

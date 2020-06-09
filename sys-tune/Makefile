@@ -42,7 +42,20 @@ BUILD		:=	build
 SOURCES		:=	source source/impl
 DATA		:=	data
 INCLUDES	:=	../ipc
-#ROMFS	:=	romfs
+
+WANT_FLAGS	:=
+
+ifeq ($(WANT_MP3),1)
+	WANT_FLAGS	+= -DWANT_MP3
+endif
+
+ifeq ($(WANT_FLAC),1)
+	WANT_FLAGS	+= -DWANT_FLAC
+endif
+
+ifeq ($(WANT_WAV),1)
+	WANT_FLAGS	+= -DWANT_WAV
+endif
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -52,7 +65,8 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) -DSYS -DRELEASE -DWANT_FLAC -DWANT_MP3 -DWANT_WAV
+CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) \
+			$(WANT_FLAGS)
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
 

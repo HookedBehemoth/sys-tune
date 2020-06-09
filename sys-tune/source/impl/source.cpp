@@ -280,21 +280,23 @@ Source *OpenFile(const char *path) {
 
     Source *source = nullptr;
 
+    if (false) {}
 #ifdef WANT_MP3
-    if (strcasecmp(path + length - 4, ".mp3") == 0) {
+    else if (strcasecmp(path + length - 4, ".mp3") == 0) {
         source = new (std::nothrow) Mp3File(std::move(file));
-    } else
+    }
 #endif
 #ifdef WANT_FLAC
-        if (strcasecmp(path + length - 5, ".flac") == 0) {
+    else if (strcasecmp(path + length - 5, ".flac") == 0) {
         source = new (std::nothrow) FlacFile(std::move(file));
-    } else
+    }
 #endif
 #ifdef WANT_WAV
-        if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
+    else if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
         source = new (std::nothrow) WavFile(std::move(file));
     }
 #endif
+
     if (source == nullptr)
         fsFileClose(&file);
 

@@ -45,12 +45,25 @@ SOURCES		:=	source ../ipc
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc
 APP_VERSION	:=	$(VERSION)
+NO_ICON		:=  1
 
 ifeq ($(RELEASE),)
 	APP_VERSION	:=	$(APP_VERSION)-$(shell git describe --dirty --always)
 endif
 
-NO_ICON		:=  1
+WANT_FLAGS	:=
+
+ifneq ($(WANT_MP3),1)
+	WANT_FLAGS	+= -DWANT_MP3
+endif
+
+ifeq ($(WANT_FLAC),1)
+	WANT_FLAGS	+= -DWANT_FLAC
+endif
+
+ifeq ($(WANT_WAV),1)
+	WANT_FLAGS	+= -DWANT_WAV
+endif
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -60,7 +73,8 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION)
+CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION) \
+			$(WANT_FLAGS)
 
 CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
 
