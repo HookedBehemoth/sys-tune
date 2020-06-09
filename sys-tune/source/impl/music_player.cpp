@@ -31,10 +31,10 @@ namespace tune::impl {
         constexpr const int MaxChannelCount = 8;
         constexpr const int BufferCount     = 2;
         constexpr const int AudioSampleSize = MinSampleCount * MaxChannelCount * sizeof(s16);
-        constexpr const int AudioPoolSize = AudioSampleSize * BufferCount;
+        constexpr const int AudioPoolSize   = AudioSampleSize * BufferCount;
         alignas(0x1000) u8 AudioMemoryPool[AudioPoolSize];
 
-        static_assert((sizeof(AudioMemoryPool) % 0x1000) == 0, "Audio Memory pool needs to be page aligned!");
+        static_assert((sizeof(AudioMemoryPool) % 0x2000) == 0, "Audio Memory pool needs to be page aligned!");
 
         bool should_pause = false;
         bool should_run   = true;
@@ -45,11 +45,12 @@ namespace tune::impl {
             R_UNLESS(source != nullptr, tune::FileOpenFailure);
             R_UNLESS(source->IsOpen(), tune::FileOpenFailure);
 
-            R_UNLESS(audrvVoiceInit(&g_drv, 0, source->GetChannelCount(), PcmFormat_Int16, source->GetSampleRate()), tune::VoiceInitFailure);
+            int channel_count = source->GetChannelCount();
+            int sample_rate   = source->GetSampleRate();
+
+            R_UNLESS(audrvVoiceInit(&g_drv, 0, channel_count, PcmFormat_Int16, sample_rate), tune::VoiceInitFailure);
 
             audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
-
-            int channel_count = source->GetChannelCount();
 
             for (int src = 0; src < channel_count; src++) {
                 audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, src, src % 2);
