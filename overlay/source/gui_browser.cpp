@@ -12,6 +12,20 @@ namespace {
         return strcasecmp(name + std::strlen(name) - std::strlen(ext), ext) == 0;
     }
 
+    constexpr const std::array SupportedTypes = {
+        ".mp3",
+        ".flac",
+        ".wav",
+        ".wave",
+    };
+
+    bool SupportsType(const char* name) {
+        for (auto &ext : SupportedTypes)
+            if (EndsWith(name, ext))
+                return true;
+        return false;
+    }
+
 }
 constexpr const char *const base_path = "/music/";
 
@@ -101,7 +115,7 @@ void BrowserGui::scanCwd() {
                 return false;
             });
             folders.push_back(item);
-        } else if (EndsWith(entry.name, ".mp3") || EndsWith(entry.name, ".wav") || EndsWith(entry.name, ".wave") || EndsWith(entry.name, ".flac")) {
+        } else if (SupportsType(entry.name)) {
             /* Add file entry. */
             auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
