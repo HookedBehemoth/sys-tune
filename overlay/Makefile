@@ -53,7 +53,7 @@ endif
 
 WANT_FLAGS	:=
 
-ifneq ($(WANT_MP3),1)
+ifeq ($(WANT_MP3),1)
 	WANT_FLAGS	+= -DWANT_MP3
 endif
 
