@@ -52,15 +52,22 @@ namespace tune::impl {
 
             audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
 
-            for (int src = 0; src < channel_count; src++) {
-                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, src, src % 2);
+            if (channel_count == 1) {
+                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 0);
+                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 1);
+            } else {
+                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 0);
+                audrvVoiceSetMixFactor(&g_drv, 0, 0.0f, 0, 1);
+                audrvVoiceSetMixFactor(&g_drv, 0, 0.0f, 1, 0);
+                audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 1, 1);
             }
+
             audrvVoiceStart(&g_drv, 0);
 
-            const s32 sample_count        = AudioSampleSize / channel_count / sizeof(s16);
-            AudioDriverWaveBuf buffers[2] = {};
+            const s32 sample_count                  = AudioSampleSize / channel_count / sizeof(s16);
+            AudioDriverWaveBuf buffers[BufferCount] = {};
 
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < BufferCount; i++) {
                 buffers[i].data_pcm16          = reinterpret_cast<s16 *>(&AudioMemoryPool);
                 buffers[i].size                = AudioSampleSize;
                 buffers[i].start_sample_offset = i * sample_count;
@@ -162,7 +169,7 @@ namespace tune::impl {
                 }
             }
 
-            /* Sleep if queue is selected. */
+            /* Sleep if queue is empty. */
             if (g_current.empty()) {
                 svcSleepThread(100'000'000ul);
                 continue;
