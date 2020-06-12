@@ -14,7 +14,7 @@ class OverlayTest : public tsl::Overlay {
     virtual void initServices() override {
         Result rc = tuneInitialize();
 
-        if (rc == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
+        if (R_VALUE(rc) == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
             u64 pid = 0;
             const NcmProgramLocation programLocation{
                 .program_id = 0x4200000000000000,
@@ -33,9 +33,11 @@ class OverlayTest : public tsl::Overlay {
             svcSleepThread(100'000'000);
             rc = tuneInitialize();
         }
+
         if (R_FAILED(rc)) {
             this->msg  = "Something went wrong:";
             this->fail = rc;
+            return;
         }
 
         u32 api;
