@@ -22,7 +22,6 @@ nxExt:
 
 module:
 	$(MAKE) -C sys-tune
-	hactool -t nso sys-tune/sys-tune.nso
 
 dist: all
 	mkdir -p dist/switch/.overlays
@@ -30,5 +29,6 @@ dist: all
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./*; cd ../;
+	hactool -t nso sys-tune/sys-tune.nso
 
 .PHONY: all overlay module
