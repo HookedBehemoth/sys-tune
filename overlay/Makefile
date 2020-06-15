@@ -41,7 +41,7 @@ APP_TITLE	:=	sys-tune overlay
 
 TARGET		:=	sys-tune-overlay
 BUILD		:=	build
-SOURCES		:=	source ../ipc
+SOURCES		:=	source source/elements ../ipc
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc
 APP_VERSION	:=	$(VERSION)

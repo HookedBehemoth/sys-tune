@@ -1,17 +1,40 @@
 #define TESLA_INIT_IMPL
-#include "tune.h"
 #include "gui_error.hpp"
-#include "gui_main.hpp"
+#include "gui_player.hpp"
+#include "tune.h"
+
+#include "gui_omni.hpp"
 
 #include <tesla.hpp>
+
+constexpr const SocketInitConfig sockConf = {
+    .bsdsockets_version = 1,
+
+    .tcp_tx_buf_size = 0x800,
+    .tcp_rx_buf_size = 0x800,
+    .tcp_tx_buf_max_size = 0x25000,
+    .tcp_rx_buf_max_size = 0x25000,
+
+    .udp_tx_buf_size = 0x800,
+    .udp_rx_buf_size = 0x800,
+
+    .sb_efficiency = 1,
+
+    .num_bsd_sessions = 0,
+    .bsd_service_type = BsdServiceType_Auto,
+};
 
 class OverlayTest : public tsl::Overlay {
   private:
     const char *msg = nullptr;
     Result fail     = 0;
+    int nxlink = -1;
 
   public:
-    virtual void initServices() override {
+    virtual void initServices() final {
+        socketInitialize(&sockConf);
+        nxlink = nxlinkStdio();
+
         Result rc = tuneInitialize();
 
         if (R_VALUE(rc) == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
@@ -46,14 +69,18 @@ class OverlayTest : public tsl::Overlay {
                         "sys-tune version!";
         }
     }
-    virtual void exitServices() override {
+    virtual void exitServices() final {
         tuneExit();
+
+        ::close(nxlink);
+        socketExit();
     }
 
-    virtual void onShow() override {}
-    virtual void onHide() override {}
+    virtual void onShow() final {}
+    virtual void onHide() final {}
 
-    virtual std::unique_ptr<tsl::Gui> loadInitialGui() override {
+    virtual std::unique_ptr<tsl::Gui> loadInitialGui() final {
+        return std::make_unique<OmniTest>();
         if (this->msg) {
             return std::make_unique<ErrorGui>(this->msg, this->fail);
         } else {
