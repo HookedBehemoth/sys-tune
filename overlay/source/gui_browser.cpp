@@ -51,7 +51,7 @@ BrowserGui::BrowserGui()
             this->has_music = true;
             fsDirClose(&dir);
         } else {
-            this->cwd[0] = '\0';
+            this->cwd[1] = '\0';
         }
         this->scanCwd();
     } else {
