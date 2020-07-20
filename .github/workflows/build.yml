@@ -8,14 +8,10 @@ jobs:
     container: devkitpro/devkita64
 
     steps:
-    - uses: actions/checkout@v1
-
     - name: Building libnx-Ext
       run: |
-        source /etc/profile.d/devkit-env.sh
         make -j$(nproc) -C sys-tune/nxExt
 
     - name: Building sys-tune
       run: |
-        source /etc/profile.d/devkit-env.sh
         API_VERSION=9 make -j$(nproc)
