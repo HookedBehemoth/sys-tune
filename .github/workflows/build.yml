@@ -8,6 +8,8 @@ jobs:
     container: devkitpro/devkita64
 
     steps:
+    - uses: actions/checkout@v1
+
     - name: Building libnx-Ext
       run: |
         make -j$(nproc) -C sys-tune/nxExt
