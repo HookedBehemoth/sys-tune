@@ -3,23 +3,17 @@ name: Build sys-tune and overlay
 on: [push]
 jobs:
   build:
-
+  
     runs-on: ubuntu-latest
+    container: devkitpro/devkita64
 
     steps:
     - uses: actions/checkout@v1
-    - name: Install devkitpro
-      run: |
-        wget https://github.com/devkitPro/pacman/releases/download/devkitpro-pacman-1.0.1/devkitpro-pacman.deb
-        sudo dpkg -i devkitpro-pacman.deb
-        sudo dkp-pacman -S switch-dev --noconfirm
 
     - name: Building libnx-Ext
       run: |
-        source /etc/profile.d/devkit-env.sh
         make -j$(nproc) -C sys-tune/nxExt
 
     - name: Building sys-tune
       run: |
-        source /etc/profile.d/devkit-env.sh
         API_VERSION=9 make -j$(nproc)
