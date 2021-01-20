@@ -1,0 +1,3 @@
+[submodule "overlay/lib"]
+	path = overlay/lib
+	url = git@github.com:WerWolv/libtesla.git
