@@ -14,7 +14,7 @@ class OverlayTest : public tsl::Overlay {
     virtual void initServices() override {
         Result rc = tuneInitialize();
 
-        if (R_VALUE(rc) == MAKERESULT(Module_Libnx, LibnxError_NotFound)) {
+        if (R_VALUE(rc) == KERNELRESULT(NotFound)) {
             u64 pid = 0;
             const NcmProgramLocation programLocation{
                 .program_id = 0x4200000000000000,

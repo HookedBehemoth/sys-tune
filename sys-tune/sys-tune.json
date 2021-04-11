@@ -78,7 +78,8 @@
 				"svcReplyAndReceive":	"0x43",
 				"svcReplyAndReceiveWithUserBuffer":	"0x44",
 				"svcCreateEvent":	"0x45",
-                "svcGetSystemInfo":    "0x6f",
+				"svcGetSystemInfo":    "0x6f",
+				"svcManageNamedPort":	"0x71",
                 "svcCallSecureMonitor": "0x7f"
 			}
         },

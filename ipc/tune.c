@@ -6,22 +6,11 @@
 
 Service g_tune;
 
-Result smAtmosphereHasService(bool *out, SmServiceName name) {
-    u8 tmp = 0;
-    Result rc = serviceDispatchInOut(smGetServiceSession(), 65100, name, tmp);
-    if (R_SUCCEEDED(rc) && out)
-        *out = tmp;
-    return rc;
-}
-
 Result tuneInitialize() {
-    SmServiceName tune = smEncodeName("tune");
-    bool exists;
-    Result rc = smAtmosphereHasService(&exists, tune);
-    if (R_SUCCEEDED(rc) && exists)
-        rc = smGetServiceWrapper(&g_tune, tune);
-    else
-        rc = MAKERESULT(Module_Libnx, LibnxError_NotFound);
+    Handle handle = 0;
+    Result rc = svcConnectToNamedPort(&handle, "tune");
+    if (R_SUCCEEDED(rc))
+        serviceCreate(&g_tune, handle);
     return rc;
 }
 
