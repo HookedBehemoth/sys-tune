@@ -73,8 +73,8 @@ tsl::elm::Element *BrowserGui::createUI() {
 
 void BrowserGui::update() {
 }
-bool BrowserGui::handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) {
-    if (keysDown & KEY_B) {
+bool BrowserGui::handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogStickState, HidAnalogStickState) {
+    if (keysDown & HidNpadButton_B) {
         if (this->has_music && this->cwd[7] == '\0') {
             return false;
         } else if (this->cwd[1] != '\0') {
@@ -113,7 +113,7 @@ void BrowserGui::scanCwd() {
             /* Add directory entries. */
             auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
-                if (down & KEY_A) {
+                if (down & HidNpadButton_A) {
                     std::sprintf(this->cwd, "%s%s/", this->cwd, item->getText().c_str());
                     this->scanCwd();
                     return true;
@@ -125,7 +125,7 @@ void BrowserGui::scanCwd() {
             /* Add file entry. */
             auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
-                if (down & KEY_A) {
+                if (down & HidNpadButton_A) {
                     std::sprintf(path_buffer, "%s%s", this->cwd, item->getText().c_str());
                     tuneEnqueue(path_buffer, TuneEnqueueType_Back);
                     return true;

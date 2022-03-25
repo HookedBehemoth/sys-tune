@@ -37,5 +37,5 @@ namespace tune {
     ({                             \
         auto tmp_res = (res_expr); \
         if (R_FAILED(tmp_res))     \
-            fatalThrow(tmp_res);   \
+            diagAbortWithResult(tmp_res);   \
     })

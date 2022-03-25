@@ -38,7 +38,7 @@ tsl::elm::Element *MainGui::createUI() {
     /* Playlist. */
     auto *queue_button = new tsl::elm::ListItem("Playlist");
     queue_button->setClickListener([](u64 keys) {
-        if (keys & KEY_A) {
+        if (keys & HidNpadButton_A) {
             tsl::changeTo<PlaylistGui>();
             return true;
         }
@@ -49,7 +49,7 @@ tsl::elm::Element *MainGui::createUI() {
     /* Browser. */
     auto *browser_button = new tsl::elm::ListItem("Music browser");
     browser_button->setClickListener([](u64 keys) {
-        if (keys & KEY_A) {
+        if (keys & HidNpadButton_A) {
             tsl::changeTo<BrowserGui>();
             return true;
         }
@@ -62,7 +62,7 @@ tsl::elm::Element *MainGui::createUI() {
 
     auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
     exit_button->setClickListener([](u64 keys) {
-        if (keys & KEY_A) {
+        if (keys & HidNpadButton_A) {
             tuneQuit();
             tsl::goBack();
             return true;

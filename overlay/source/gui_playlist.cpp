@@ -30,10 +30,10 @@ namespace {
                 if (Element::getInputMode() == tsl::InputMode::Touch) {
                     bool handled = false;
                     if (currX > this->getLeftBound() && currX < (this->getRightBound() - this->getHeight()) && currY > this->getTopBound() && currY < this->getBottomBound())
-                        handled = this->onClick(KEY_A);
+                        handled = this->onClick(HidNpadButton_A);
 
                     if (currX > (this->getRightBound() - this->getHeight()) && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound())
-                        handled = this->onClick(KEY_Y);
+                        handled = this->onClick(HidNpadButton_Y);
 
                     this->m_clickAnimationProgress = 0;
                     return handled;
@@ -83,11 +83,11 @@ PlaylistGui::PlaylistGui() {
         item->setClickListener([this, item](u64 keys) -> bool {
             u32 index  = this->m_list->getIndexInList(item);
             u8 counter = 0;
-            if (keys & KEY_A) {
+            if (keys & HidNpadButton_A) {
                 tuneSelect(index);
                 counter++;
             }
-            if (keys & KEY_Y) {
+            if (keys & HidNpadButton_Y) {
                 if (R_SUCCEEDED(tuneRemove(index))) {
                     this->removeFocus();
                     this->m_list->removeIndex(index);

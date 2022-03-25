@@ -15,7 +15,7 @@ class BrowserGui final : public tsl::Gui {
 
     virtual tsl::elm::Element *createUI() final;
     virtual void update() final;
-    virtual bool handleInput(u64 keysDown, u64, touchPosition, JoystickPosition, JoystickPosition) final;
+    virtual bool handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogStickState, HidAnalogStickState) final;
 
   private:
     void scanCwd();

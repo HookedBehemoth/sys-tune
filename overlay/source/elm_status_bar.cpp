@@ -123,31 +123,31 @@ void StatusBar::layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeig
 
 bool StatusBar::onClick(u64 keys) {
     u8 handled = 0;
-    if (keys & KEY_A) {
+    if (keys & HidNpadButton_A) {
         this->CyclePlay();
         handled++;
     }
-    if (keys & KEY_X) {
+    if (keys & HidNpadButton_X) {
         this->CycleRepeat();
         handled++;
     }
-    if (keys & KEY_Y) {
+    if (keys & HidNpadButton_Y) {
         this->CycleShuffle();
         handled++;
     }
-    if (keys & KEY_RIGHT) {
+    if (keys & HidNpadButton_Right) {
         this->Next();
         handled++;
     }
-    if (keys & KEY_LEFT) {
+    if (keys & HidNpadButton_Left) {
         this->Prev();
         handled++;
     }
-    if (keys & KEY_ZL) {
+    if (keys & HidNpadButton_ZL) {
         this->Backward();
         handled++;
     }
-    if (keys & KEY_ZR) {
+    if (keys & HidNpadButton_ZR) {
         this->Forward();
         handled++;
     }
@@ -241,12 +241,12 @@ void StatusBar::update() {
 }
 
 void StatusBar::CycleRepeat() {
-    this->m_repeat = TuneRepeatMode((this->m_repeat + 1) % 3);
+    this->m_repeat = static_cast<TuneRepeatMode>((this->m_repeat + 1) % TuneRepeatMode_Count);
     tuneSetRepeatMode(this->m_repeat);
 }
 
 void StatusBar::CycleShuffle() {
-    this->m_shuffle = TuneShuffleMode((this->m_shuffle + 1) % 2);
+    this->m_shuffle = static_cast<TuneShuffleMode>((this->m_shuffle + 1) % TuneShuffleMode_Count);
     tuneSetShuffleMode(this->m_shuffle);
 }
 

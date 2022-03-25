@@ -9,17 +9,23 @@ extern "C" {
 typedef enum {
     TuneShuffleMode_Off,
     TuneShuffleMode_On,
+
+    TuneShuffleMode_Count,
 } TuneShuffleMode;
 
 typedef enum {
     TuneRepeatMode_Off,
     TuneRepeatMode_One,
     TuneRepeatMode_All,
+
+    TuneRepeatMode_Count,
 } TuneRepeatMode;
 
 typedef enum {
     TuneEnqueueType_Front,
     TuneEnqueueType_Back,
+
+    TuneEnqueueType_Count,
 } TuneEnqueueType;
 
 typedef struct {

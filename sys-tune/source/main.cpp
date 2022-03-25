@@ -44,16 +44,11 @@ void __appInit() {
     R_ABORT_UNLESS(audrenInitialize(&audren_cfg));
     R_ABORT_UNLESS(fsInitialize());
     R_ABORT_UNLESS(sdmc::Open());
-    R_ABORT_UNLESS(tune::InitializeServer());
     smExit();
 }
 
 void __appExit(void) {
     sdmc::Close();
-
-    R_ABORT_UNLESS(smInitialize());
-    R_ABORT_UNLESS(tune::ExitServer());
-    smExit();
 
     fsExit();
     audrenExit();
@@ -73,11 +68,11 @@ int main(int argc, char *argv[]) {
     R_ABORT_UNLESS(tune::impl::Initialize());
 
     /* Register audio as our dependency so we can pause before it prepares for sleep. */
-    constexpr const u16 dependencies[] = {PscPmModuleId_Audio};
+    constexpr const u32 dependencies[] = { PscPmModuleId_Audio };
 
     /* Get pm module to listen for state change. */
     PscPmModule pm_module;
-    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, sizeof(dependencies) / sizeof(u16), true));
+    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, sizeof(dependencies) / sizeof(u32), true));
 
     /* Get GPIO session for the headphone jack pad. */
     GpioPadSession headphone_detect_session;
@@ -95,7 +90,9 @@ int main(int argc, char *argv[]) {
     R_ABORT_UNLESS(threadStart(&tuneThread));
 
     /* Create services */
+    R_ABORT_UNLESS(tune::InitializeServer());
     tune::LoopProcess();
+    R_ABORT_UNLESS(tune::ExitServer());
 
     tune::impl::Exit();
     svcCancelSynchronization(gpioThread.handle);

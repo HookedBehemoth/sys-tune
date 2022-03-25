@@ -28,7 +28,7 @@ dist: all
 	mkdir -p dist/atmosphere/contents/4200000000000000
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
-	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./*; cd ../;
+	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./**/; cd ../;
 	hactool -t nso sys-tune/sys-tune.nso
 
 .PHONY: all overlay module
