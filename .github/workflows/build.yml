@@ -19,3 +19,8 @@ jobs:
     - name: Building sys-tune
       run: |
         API_VERSION=9 make -j$(nproc)
+
+    - name: Print segment size
+      run: |
+        apt --yes install binutils
+        size sys-tune/sys-tune.elf
