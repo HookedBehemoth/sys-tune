@@ -66,11 +66,18 @@ ifeq ($(WANT_WAV),1)
 endif
 
 #---------------------------------------------------------------------------------
+# facilitate weakly linked functions
+#---------------------------------------------------------------------------------
+CXXREQUIRED :=	-Wl,--require-defined,__appInit \
+                -Wl,--require-defined,__appExit
+init_libnx_shim.o: CXXFLAGS += -fno-lto
+
+#---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -O3 -ffunction-sections \
+CFLAGS	:=	-g -Wall -O3 -ffunction-sections -flto \
 			$(ARCH) $(DEFINES)
 
 CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION) \
@@ -79,7 +86,8 @@ CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERS
 CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) $(CXXREQUIRED) \
+			-Wl,-Map,$(notdir $*.map) -flto
 
 LIBS	:= -lnx
 
