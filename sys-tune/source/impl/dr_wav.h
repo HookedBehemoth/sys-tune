@@ -5516,7 +5516,7 @@ DRWAV_API drwav_bool32 drwav_seek_to_pcm_frame(drwav* pWav, drwav_uint64 targetF
         if (targetFrameIndex > pWav->readCursorInPCMFrames) {
             drwav_uint64 offsetInFrames = targetFrameIndex - pWav->readCursorInPCMFrames;
 
-            drwav_int16 devnull[2048];
+            static drwav_int16 devnull[2048];
             while (offsetInFrames > 0) {
                 drwav_uint64 framesRead = 0;
                 drwav_uint64 framesToRead = offsetInFrames;
