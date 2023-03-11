@@ -185,6 +185,7 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
     }
     
     s64 count = 0;
+    s64 songs_added = 0;
     FsDirectoryEntry entry;
 
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
@@ -197,7 +198,11 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
     for (auto element : filesInside) {
         std::sprintf(path_buffer, "%s%s", this->cwd, element->getText().c_str());
         tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+        songs_added++;
     }
+
+    std::string res = "Added " + std::to_string(songs_added) + " songs to Playlist.";
+    this->infoAlert("Playlist updated", res);
 }
 
 /* Adds an information alert at the start. */
