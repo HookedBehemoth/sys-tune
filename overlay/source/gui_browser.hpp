@@ -10,7 +10,7 @@ class BrowserGui final : public tsl::Gui {
     char cwd[FS_MAX_PATH];
     /* Parameters for controlling the info section */
     tsl::elm::CategoryHeader* info_header;
-    tsl::elm::CustomDrawer* info_draw_string;
+    tsl::elm::ListItem* info_item;
     bool show_info;
 
   public:
@@ -25,5 +25,5 @@ class BrowserGui final : public tsl::Gui {
     void scanCwd();
     void upCwd();
     void addAllToPlaylist(FsDir dir);
-    void infoAlert(std::string text, tsl::elm::List *list);
+    void infoAlert(std::string title, std::string text);
 };

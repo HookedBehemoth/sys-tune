@@ -37,28 +37,9 @@ constexpr const char *const base_path = "/music/";
 
 char path_buffer[FS_MAX_PATH];
 
-/* Adds an information alert at the start. */
-void BrowserGui::infoAlert(std::string text, tsl::elm::List *list) {
-    this->info_draw_string = new tsl::elm::CustomDrawer([text](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
-            renderer->drawString(text.c_str(), false, x + 50, y + 50, 20, renderer->a(0xFFFF));
-        });
-        
-    if(!this->show_info){
-        this->info_header = new tsl::elm::CategoryHeader("Info", true);
-        list->addItem(this->info_header, 0, 0);
-        list->addItem(this->info_draw_string, 100, 1);
-
-        this->show_info = true;
-    } else {
-        list->removeIndex(1);
-        list->addItem(this->info_draw_string, 100, 1);
-    }
-}
-
 BrowserGui::BrowserGui()
     : m_fs(), has_music(), cwd("/"), show_info() {
     this->m_list = new tsl::elm::List();
-    this->show_info = false;
 
     /* Open sd card filesystem. */
     Result rc = fsOpenSdCardFileSystem(&this->m_fs);
@@ -107,6 +88,7 @@ bool BrowserGui::handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogS
 void BrowserGui::scanCwd() {
     tsl::Gui::removeFocus();
     this->m_list->clear();
+    this->show_info = false;
 
     /* Show absolute folder path. */
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
@@ -176,6 +158,20 @@ void BrowserGui::scanCwd() {
     }
 }
 
+void BrowserGui::upCwd() {
+    size_t length = std::strlen(this->cwd);
+    if (length <= 1)
+        return;
+
+    for (size_t i = length - 2; i >= 0; i--) {
+        if (this->cwd[i] == '/') {
+            this->cwd[i + 1] = '\0';
+            this->scanCwd();
+            return;
+        }
+    }
+}
+
 void BrowserGui::addAllToPlaylist(FsDir dir) {
     std::vector<tsl::elm::ListItem *> filesInside;
     
@@ -204,16 +200,18 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
     }
 }
 
-void BrowserGui::upCwd() {
-    size_t length = std::strlen(this->cwd);
-    if (length <= 1)
-        return;
+/* Adds an information alert at the start. */
+void BrowserGui::infoAlert(std::string title, std::string text) {
+    this->info_item = new tsl::elm::ListItem(text);
+    
+    if(!this->show_info){
+        this->info_header = new tsl::elm::CategoryHeader(title, true);
+        this->m_list->addItem(this->info_header, 0, 0);
+        this->m_list->addItem(this->info_item, 100, 1);
 
-    for (size_t i = length - 2; i >= 0; i--) {
-        if (this->cwd[i] == '/') {
-            this->cwd[i + 1] = '\0';
-            this->scanCwd();
-            return;
-        }
+        this->show_info = true;
+    } else {
+        this->m_list->removeIndex(1);
+        this->m_list->addItem(this->info_item, 100, 1);
     }
 }
