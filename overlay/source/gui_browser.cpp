@@ -37,9 +37,28 @@ constexpr const char *const base_path = "/music/";
 
 char path_buffer[FS_MAX_PATH];
 
+/* Adds an information alert at the start. */
+void BrowserGui::infoAlert(std::string text, tsl::elm::List *list) {
+    this->info_draw_string = new tsl::elm::CustomDrawer([text](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
+            renderer->drawString(text.c_str(), false, x + 50, y + 50, 20, renderer->a(0xFFFF));
+        });
+        
+    if(!this->show_info){
+        this->info_header = new tsl::elm::CategoryHeader("Info", true);
+        list->addItem(this->info_header, 0, 0);
+        list->addItem(this->info_draw_string, 100, 1);
+
+        this->show_info = true;
+    } else {
+        list->removeIndex(1);
+        list->addItem(this->info_draw_string, 100, 1);
+    }
+}
+
 BrowserGui::BrowserGui()
-    : m_fs(), has_music(), cwd("/") {
+    : m_fs(), has_music(), cwd("/"), show_info() {
     this->m_list = new tsl::elm::List();
+    this->show_info = false;
 
     /* Open sd card filesystem. */
     Result rc = fsOpenSdCardFileSystem(&this->m_fs);
