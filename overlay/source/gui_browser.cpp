@@ -124,10 +124,14 @@ void BrowserGui::scanCwd() {
         } else if (SupportsType(entry.name)) {
             /* Add file entry. */
             auto *item = new tsl::elm::ListItem(entry.name);
-            item->setClickListener([this, item](u64 down) -> bool {
+            item->setClickListener([this, item, dir](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
                     std::sprintf(path_buffer, "%s%s", this->cwd, item->getText().c_str());
                     tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+                    return true;
+                }
+                if (down & HidNpadButton_X) {
+                    this->addAllToPlaylist(dir);
                     return true;
                 }
                 return false;
@@ -150,6 +154,34 @@ void BrowserGui::scanCwd() {
         std::sort(files.begin(), files.end(), ListItemTextCompare);
         for (auto element : files)
             this->m_list->addItem(element);
+    }
+}
+
+void BrowserGui::addAllToPlaylist(FsDir dir) {
+    std::vector<tsl::elm::ListItem *> filesInside;
+    
+    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, &dir);
+    if (R_FAILED(rc)) {
+        char result_buffer[0x10];
+        std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
+        this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
+        return;
+    }
+    
+    s64 count = 0;
+    FsDirectoryEntry entry;
+
+    while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
+        if (SupportsType(entry.name)){
+            auto *item = new tsl::elm::ListItem(entry.name);
+            filesInside.push_back(item);
+        }
+    }
+    
+    for (auto element : filesInside) {
+        std::sprintf(path_buffer, "%s%s", this->cwd, element->getText().c_str());
+        tuneEnqueue(path_buffer, TuneEnqueueType_Back);
     }
 }
 

@@ -20,4 +20,5 @@ class BrowserGui final : public tsl::Gui {
   private:
     void scanCwd();
     void upCwd();
+    void addAllToPlaylist(FsDir dir);
 };
