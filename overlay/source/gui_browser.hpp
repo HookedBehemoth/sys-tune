@@ -12,6 +12,8 @@ class BrowserGui final : public tsl::Gui {
     tsl::elm::CategoryHeader* info_header;
     tsl::elm::ListItem* info_item;
     bool show_info;
+    /* Updates songs added from a directory */
+    s64 songs_added;
 
   public:
     BrowserGui();

@@ -89,6 +89,7 @@ void BrowserGui::scanCwd() {
     tsl::Gui::removeFocus();
     this->m_list->clear();
     this->show_info = false;
+    this->songs_added = 0;
 
     /* Show absolute folder path. */
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
@@ -185,7 +186,6 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
     }
     
     s64 count = 0;
-    s64 songs_added = 0;
     FsDirectoryEntry entry;
 
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
@@ -198,10 +198,10 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
     for (auto element : filesInside) {
         std::sprintf(path_buffer, "%s%s", this->cwd, element->getText().c_str());
         tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-        songs_added++;
+        this->songs_added++;
     }
 
-    std::string res = "Added " + std::to_string(songs_added) + " songs to Playlist.";
+    std::string res = "Added " + std::to_string(this->songs_added) + " songs to Playlist.";
     this->infoAlert("Playlist updated", res);
 }
 
