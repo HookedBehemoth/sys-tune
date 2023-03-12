@@ -188,7 +188,7 @@ void BrowserGui::addAllToPlaylist() {
     s64 count = 0;
     FsDirectoryEntry entry;
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
-        if (SupportsType(entry.name)){
+        if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
             std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, entry.name);
             tuneEnqueue(path_buffer, TuneEnqueueType_Back);
             songs_added++;
