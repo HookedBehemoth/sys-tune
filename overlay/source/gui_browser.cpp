@@ -38,7 +38,7 @@ constexpr const char *const base_path = "/music/";
 char path_buffer[FS_MAX_PATH];
 
 BrowserGui::BrowserGui()
-    : m_fs(), has_music(), cwd("/"), show_info() {
+    : m_fs(), has_music(), cwd("/") {
     this->m_list = new tsl::elm::List();
 
     /* Open sd card filesystem. */
@@ -81,6 +81,9 @@ bool BrowserGui::handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogS
             this->upCwd();
             return true;
         }
+    } else if (keysDown & HidNpadButton_X) {
+        this->addAllToPlaylist();
+        return true;
     }
     return false;
 }
@@ -88,8 +91,6 @@ bool BrowserGui::handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogS
 void BrowserGui::scanCwd() {
     tsl::Gui::removeFocus();
     this->m_list->clear();
-    this->show_info = false;
-    this->songs_added = 0;
 
     /* Show absolute folder path. */
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
@@ -104,6 +105,7 @@ void BrowserGui::scanCwd() {
         this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
         return;
     }
+    tsl::hlp::ScopeGuard dirGuard([&] { fsDirClose(&dir); });
 
     std::vector<tsl::elm::ListItem *> folders, files;
 
@@ -116,7 +118,8 @@ void BrowserGui::scanCwd() {
             auto *item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
-                    std::sprintf(this->cwd, "%s%s/", this->cwd, item->getText().c_str());
+                    std::strncat(this->cwd, item->getText().c_str(), sizeof(this->cwd) - 1);
+                    std::strncat(this->cwd, "/", sizeof(this->cwd) - 1);
                     this->scanCwd();
                     return true;
                 }
@@ -126,14 +129,10 @@ void BrowserGui::scanCwd() {
         } else if (SupportsType(entry.name)) {
             /* Add file entry. */
             auto *item = new tsl::elm::ListItem(entry.name);
-            item->setClickListener([this, item, dir](u64 down) -> bool {
+            item->setClickListener([this, item](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
-                    std::sprintf(path_buffer, "%s%s", this->cwd, item->getText().c_str());
+                    std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
                     tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-                    return true;
-                }
-                if (down & HidNpadButton_X) {
-                    this->addAllToPlaylist(dir);
                     return true;
                 }
                 return false;
@@ -173,9 +172,8 @@ void BrowserGui::upCwd() {
     }
 }
 
-void BrowserGui::addAllToPlaylist(FsDir dir) {
-    std::vector<tsl::elm::ListItem *> filesInside;
-    
+void BrowserGui::addAllToPlaylist() {
+    FsDir dir;
     Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, &dir);
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
@@ -184,39 +182,28 @@ void BrowserGui::addAllToPlaylist(FsDir dir) {
         this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
         return;
     }
+    tsl::hlp::ScopeGuard dirGuard([&] { fsDirClose(&dir); });
     
+    s64 songs_added = 0;
     s64 count = 0;
     FsDirectoryEntry entry;
-
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
         if (SupportsType(entry.name)){
-            auto *item = new tsl::elm::ListItem(entry.name);
-            filesInside.push_back(item);
+            std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, entry.name);
+            tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+            songs_added++;
         }
     }
-    
-    for (auto element : filesInside) {
-        std::sprintf(path_buffer, "%s%s", this->cwd, element->getText().c_str());
-        tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-        this->songs_added++;
-    }
 
-    std::string res = "Added " + std::to_string(this->songs_added) + " songs to Playlist.";
-    this->infoAlert("Playlist updated", res);
+    std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist.", songs_added);
+    this->infoAlert("Playlist updated", path_buffer);
 }
 
 /* Adds an information alert at the start. */
-void BrowserGui::infoAlert(std::string title, std::string text) {
-    this->info_item = new tsl::elm::ListItem(text);
-    
-    if(!this->show_info){
-        this->info_header = new tsl::elm::CategoryHeader(title, true);
-        this->m_list->addItem(this->info_header, 0, 0);
-        this->m_list->addItem(this->info_item, 100, 1);
+void BrowserGui::infoAlert(const std::string &title, const std::string &text) {
+    auto info_header = new tsl::elm::CategoryHeader(title, true);
+    auto info_item = new tsl::elm::ListItem(text);
 
-        this->show_info = true;
-    } else {
-        this->m_list->removeIndex(1);
-        this->m_list->addItem(this->info_item, 100, 1);
-    }
+    this->m_list->addItem(info_header, 0, 0);
+    this->m_list->addItem(info_item, 100, 1);
 }
