@@ -1,5 +1,6 @@
 #include "gui_main.hpp"
 
+#include "elm_overlayframe.hpp"
 #include "gui_browser.hpp"
 #include "gui_playlist.hpp"
 
@@ -29,7 +30,7 @@ MainGui::MainGui() {
 }
 
 tsl::elm::Element *MainGui::createUI() {
-    auto *frame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
+    auto *frame = new SysTuneOverlayFrame();
     auto *list  = new tsl::elm::List();
 
     /* Current track. */

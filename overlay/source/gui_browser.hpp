@@ -2,8 +2,11 @@
 
 #include <tesla.hpp>
 
+#include "elm_overlayframe.hpp"
+
 class BrowserGui final : public tsl::Gui {
   private:
+    SysTuneOverlayFrame* m_frame;
     tsl::elm::List *m_list;
     FsFileSystem m_fs;
     bool has_music;
