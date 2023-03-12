@@ -1,5 +1,6 @@
 #include "gui_playlist.hpp"
 
+#include "elm_overlayframe.hpp"
 #include "tune.h"
 
 namespace {
@@ -111,7 +112,7 @@ PlaylistGui::PlaylistGui() {
 }
 
 tsl::elm::Element *PlaylistGui::createUI() {
-    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
+    auto rootFrame = new SysTuneOverlayFrame();
 
     rootFrame->setContent(this->m_list);
 

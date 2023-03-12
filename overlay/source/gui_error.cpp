@@ -1,5 +1,7 @@
 #include "gui_error.hpp"
 
+#include "elm_overlayframe.hpp"
+
 static char result_buffer[10];
 
 ErrorGui::ErrorGui(const char *msg, Result rc) : m_msg(msg) {
@@ -10,7 +12,7 @@ ErrorGui::ErrorGui(const char *msg, Result rc) : m_msg(msg) {
 }
 
 tsl::elm::Element *ErrorGui::createUI() {
-    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
+    auto rootFrame = new SysTuneOverlayFrame();
 
     auto *custom = new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer *drawer, u16 x, u16 y, u16 w, u16 h) {
         drawer->drawString("\uE150", false, x + (w / 2) - (90 / 2), 300, 90, 0xffff);

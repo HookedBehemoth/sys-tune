@@ -64,11 +64,12 @@ BrowserGui::~BrowserGui() {
 }
 
 tsl::elm::Element *BrowserGui::createUI() {
-    auto rootFrame = new tsl::elm::OverlayFrame("ovl-tune \u266B", VERSION);
+    m_frame = new SysTuneOverlayFrame();
 
-    rootFrame->setContent(this->m_list);
+    m_frame->setDescription("\uE0E1  Back     \uE0E0  OK     \uE0E2  Add All");
+    m_frame->setContent(this->m_list);
 
-    return rootFrame;
+    return m_frame;
 }
 
 void BrowserGui::update() {
@@ -196,14 +197,5 @@ void BrowserGui::addAllToPlaylist() {
     }
 
     std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist.", songs_added);
-    this->infoAlert("Playlist updated", path_buffer);
-}
-
-/* Adds an information alert at the start. */
-void BrowserGui::infoAlert(const std::string &title, const std::string &text) {
-    auto info_header = new tsl::elm::CategoryHeader(title, true);
-    auto info_item = new tsl::elm::ListItem(text);
-
-    this->m_list->addItem(info_header, 0, 0);
-    this->m_list->addItem(info_item, 100, 1);
+    m_frame->setToast("Playlist updated", path_buffer);
 }
