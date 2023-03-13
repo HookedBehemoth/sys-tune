@@ -185,16 +185,23 @@ void BrowserGui::addAllToPlaylist() {
     }
     tsl::hlp::ScopeGuard dirGuard([&] { fsDirClose(&dir); });
     
+    std::vector<tsl::elm::ListItem*> files;
     s64 songs_added = 0;
     s64 count = 0;
     FsDirectoryEntry entry;
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
         if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
-            std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, entry.name);
-            tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-            songs_added++;
+            auto *item = new tsl::elm::ListItem(entry.name);
+            files.push_back(item);
         }
     }
+
+    std::sort(files.begin(), files.end(), ListItemTextCompare);
+    for (auto const & item : files) {
+        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
+        tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+        songs_added++;
+    }       
 
     std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist.", songs_added);
     m_frame->setToast("Playlist updated", path_buffer);
