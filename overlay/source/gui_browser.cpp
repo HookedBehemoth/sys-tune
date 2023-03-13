@@ -134,6 +134,7 @@ void BrowserGui::scanCwd() {
                 if (down & HidNpadButton_A) {
                     std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
                     tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+                    m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
                     return true;
                 }
                 return false;
