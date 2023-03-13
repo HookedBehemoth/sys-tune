@@ -8,6 +8,10 @@ namespace {
         return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
     };
 
+    bool StringTextCompare(std::string _lhs, std::string _rhs) {
+        return strcasecmp(_lhs.c_str(), _rhs.c_str()) < 0;
+    };
+
     ALWAYS_INLINE bool EndsWith(const char *name, const char *ext) {
         return strcasecmp(name + std::strlen(name) - std::strlen(ext), ext) == 0;
     }
@@ -186,20 +190,20 @@ void BrowserGui::addAllToPlaylist() {
     }
     tsl::hlp::ScopeGuard dirGuard([&] { fsDirClose(&dir); });
     
-    std::vector<tsl::elm::ListItem*> files;
+    std::vector<std::string> file_list; 
     s64 songs_added = 0;
     s64 count = 0;
     FsDirectoryEntry entry;
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
         if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
-            auto *item = new tsl::elm::ListItem(entry.name);
-            files.push_back(item);
+            file_list.push_back(std::string(entry.name));
+            count++;
         }
     }
 
-    std::sort(files.begin(), files.end(), ListItemTextCompare);
-    for (auto const & item : files) {
-        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
+    std::sort(file_list.begin(), file_list.end(), StringTextCompare);
+    for (auto const & file : file_list) {
+        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, file.c_str());
         tuneEnqueue(path_buffer, TuneEnqueueType_Back);
         songs_added++;
     }       
