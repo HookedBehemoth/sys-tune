@@ -137,8 +137,12 @@ void BrowserGui::scanCwd() {
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
                     std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
-                    tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-                    m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
+                    Result rc = tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+                    if (R_SUCCEEDED(rc)) {
+                        m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
+                    } else {
+                        m_frame->setToast("Failed to add Track.", "Does the name contain umlauts?");
+                    }
                     return true;
                 }
                 return false;
@@ -204,9 +208,9 @@ void BrowserGui::addAllToPlaylist() {
     std::sort(file_list.begin(), file_list.end(), StringTextCompare);
     for (auto const & file : file_list) {
         std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, file.c_str());
-        tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-        songs_added++;
-    }       
+        rc = tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+        if (R_SUCCEEDED(rc)) songs_added++;
+    }
 
     std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist.", songs_added);
     m_frame->setToast("Playlist updated", path_buffer);
