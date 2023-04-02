@@ -115,7 +115,7 @@ tsl::elm::Element *PlaylistGui::createUI() {
     auto rootFrame = new SysTuneOverlayFrame();
 
     rootFrame->setContent(this->m_list);
-    rootFrame->setDescription("\uE0E1  Back     \uE0E0  OK     \uE0E3  Remove");
+    rootFrame->setDescription("\uE0E1  Back     \uE0E0  Play   \uE0E3  Remove");
 
     return rootFrame;
 }
