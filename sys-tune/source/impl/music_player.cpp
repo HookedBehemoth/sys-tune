@@ -1,7 +1,9 @@
 #include "music_player.hpp"
 
 #include "../tune_result.hpp"
-#include "sdmc.hpp"
+#include "sdmc/sdmc.hpp"
+#include "pm/pm.hpp"
+#include "config/config.hpp"
 #include "source.hpp"
 
 #include <algorithm>
@@ -143,6 +145,9 @@ namespace tune::impl {
             }
         }
 
+        g_repeat = static_cast<RepeatMode>(config::get_repeat());
+        g_shuffle = static_cast<ShuffleMode>(config::get_shuffle());
+        g_drv.in_mixes[0].volume = (float(config::get_volume()) / 20) * 2;
         return rc;
     }
 
@@ -238,6 +243,28 @@ namespace tune::impl {
                         should_pause = false;
                 }
                 old_value = value;
+            }
+            svcSleepThread(10'000'000);
+        }
+    }
+
+    void PmdmntThreadFunc(void *ptr) {
+        u64 previous_tid{};
+        u64 current_tid{};
+        bool previous_state{};
+
+        while (should_run) {
+            u64 new_tid{};
+            if (pm::PollCurrentTitle(new_tid)) {
+                if (new_tid == previous_tid) {
+                    should_pause = previous_state;
+                } else {
+                    previous_state = should_pause;
+                    // TODO: fade song in rather than abruptly playing to avoid jump scares
+                    should_pause = !config::get_title(new_tid, true);
+                }
+                previous_tid = current_tid;
+                current_tid = new_tid;
             }
             svcSleepThread(10'000'000);
         }

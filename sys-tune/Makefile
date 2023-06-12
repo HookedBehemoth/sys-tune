@@ -39,9 +39,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/impl
+SOURCES		:=	source source/impl ../common/minIni ../common/sdmc ../common/config ../common/pm
 DATA		:=	data
-INCLUDES	:=	../ipc
+INCLUDES	:=	../ipc ../common
 
 WANT_FLAGS	:=
 
@@ -68,7 +68,7 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) \
 			$(WANT_FLAGS)
 
-CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)

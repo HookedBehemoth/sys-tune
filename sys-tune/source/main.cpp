@@ -1,5 +1,6 @@
 #include "impl/music_player.hpp"
-#include "impl/sdmc.hpp"
+#include "sdmc/sdmc.hpp"
+#include "pm/pm.hpp"
 #include "impl/source.hpp"
 #include "tune_service.hpp"
 #include "tune_result.hpp"
@@ -43,12 +44,14 @@ void __appInit() {
     R_ABORT_UNLESS(pscmInitialize());
     R_ABORT_UNLESS(audrenInitialize(&audren_cfg));
     R_ABORT_UNLESS(fsInitialize());
+    R_ABORT_UNLESS(pm::Initialize());
     R_ABORT_UNLESS(sdmc::Open());
     smExit();
 }
 
 void __appExit(void) {
     sdmc::Close();
+    pm::Exit();
 
     fsExit();
     audrenExit();
@@ -60,6 +63,7 @@ namespace {
 
     alignas(0x1000) u8 gpioThreadBuffer[0x1000];
     alignas(0x1000) u8 pscmThreadBuffer[0x1000];
+    alignas(0x1000) u8 pmdmntThreadBuffer[0x1000];
     alignas(0x1000) u8 tuneThreadBuffer[0x6000];
 
 }
@@ -80,13 +84,16 @@ int main(int argc, char *argv[]) {
 
     ::Thread gpioThread;
     ::Thread pscmThread;
+    ::Thread pmdmtThread;
     ::Thread tuneThread;
-    R_ABORT_UNLESS(threadCreate(&gpioThread, tune::impl::GpioThreadFunc, &headphone_detect_session, gpioThreadBuffer, 0x1000, 0x20, -2));
-    R_ABORT_UNLESS(threadCreate(&pscmThread, tune::impl::PscmThreadFunc, &pm_module, pscmThreadBuffer, 0x1000, 0x20, -2));
-    R_ABORT_UNLESS(threadCreate(&tuneThread, tune::impl::TuneThreadFunc, nullptr, tuneThreadBuffer, 0x6000, 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&gpioThread, tune::impl::GpioThreadFunc, &headphone_detect_session, gpioThreadBuffer, sizeof(gpioThreadBuffer), 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&pscmThread, tune::impl::PscmThreadFunc, &pm_module, pscmThreadBuffer, sizeof(pscmThreadBuffer), 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&pmdmtThread, tune::impl::PmdmntThreadFunc, nullptr, pmdmntThreadBuffer, sizeof(pmdmntThreadBuffer), 0x20, -2));
+    R_ABORT_UNLESS(threadCreate(&tuneThread, tune::impl::TuneThreadFunc, nullptr, tuneThreadBuffer, sizeof(tuneThreadBuffer), 0x20, -2));
 
     R_ABORT_UNLESS(threadStart(&gpioThread));
     R_ABORT_UNLESS(threadStart(&pscmThread));
+    R_ABORT_UNLESS(threadStart(&pmdmtThread));
     R_ABORT_UNLESS(threadStart(&tuneThread));
 
     /* Create services */
@@ -100,10 +107,12 @@ int main(int argc, char *argv[]) {
 
     R_ABORT_UNLESS(threadWaitForExit(&gpioThread));
     R_ABORT_UNLESS(threadWaitForExit(&pscmThread));
+    R_ABORT_UNLESS(threadWaitForExit(&pmdmtThread));
     R_ABORT_UNLESS(threadWaitForExit(&tuneThread));
 
     R_ABORT_UNLESS(threadClose(&gpioThread));
     R_ABORT_UNLESS(threadClose(&pscmThread));
+    R_ABORT_UNLESS(threadClose(&pmdmtThread));
     R_ABORT_UNLESS(threadClose(&tuneThread));
 
     /* Close gpio session. */

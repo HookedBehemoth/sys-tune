@@ -3,6 +3,8 @@
 #include "elm_overlayframe.hpp"
 #include "gui_browser.hpp"
 #include "gui_playlist.hpp"
+#include "pm/pm.hpp"
+#include "config/config.hpp"
 
 namespace {
 
@@ -11,6 +13,7 @@ namespace {
 
     void volumeCallback(u8 value) {
         float music_volume = (float(value) / num_steps) * max_volume;
+        config::set_volume(value);
         tuneSetVolume(music_volume);
     }
 
@@ -32,6 +35,13 @@ MainGui::MainGui() {
 tsl::elm::Element *MainGui::createUI() {
     auto *frame = new SysTuneOverlayFrame();
     auto *list  = new tsl::elm::List();
+    u64 tid{};
+    pm::PollCurrentTitle(tid);
+    const auto config_option = config::get_title(tid, false);
+    const auto default_option = config::get_title_default();
+
+    char id_buf[21]{};
+    std::sprintf(id_buf, "%016lx", tid);
 
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
@@ -60,6 +70,25 @@ tsl::elm::Element *MainGui::createUI() {
 
     /* Volume indicator */
     list->addItem(this->m_volume_slider);
+
+    /* Title Config. */
+    auto title_config_item = new tsl::elm::ToggleListItem(std::string{""} + id_buf, config_option, "Play", "Pause");
+    title_config_item->setStateChangedListener([tid](bool new_value) {
+        config::set_title(tid, new_value);
+        if (new_value) {
+            tunePlay();
+        } else {
+            tunePause();
+        }
+    });
+    list->addItem(title_config_item);
+
+    /* Default Config. */
+    auto default_config_item = new tsl::elm::ToggleListItem("Global default", default_option, "Play", "Pause");
+    default_config_item->setStateChangedListener([](bool new_value) {
+        config::set_title_default(new_value);
+    });
+    list->addItem(default_config_item);
 
     auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
     exit_button->setClickListener([](u64 keys) {

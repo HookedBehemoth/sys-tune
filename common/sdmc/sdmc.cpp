@@ -27,7 +27,12 @@ namespace sdmc {
     bool FileExists(const char* path) {
         std::strcpy(path_buffer, path);
         FsTimeStampRaw ts;
-        return R_SUCCEEDED(fsFsGetFileTimeStampRaw(&sdmc, path, &ts));
+        return R_SUCCEEDED(fsFsGetFileTimeStampRaw(&sdmc, path_buffer, &ts));
+    }
+
+    Result CreateFolder(const char* path) {
+        std::strcpy(path_buffer, path);
+        return fsFsCreateDirectory(&sdmc, path_buffer);
     }
 
 }

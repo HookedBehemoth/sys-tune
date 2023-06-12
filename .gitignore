@@ -5,7 +5,7 @@
 *.nacp
 *.npdm
 *.ovl
-.vscode
+.vscode/settings.json
 build
 dist
 *.zip

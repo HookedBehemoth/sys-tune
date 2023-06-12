@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "switch",
+            "includePath": [
+                "${default}",
+                "${workspaceFolder}/**",
+                "${DEVKITPRO}/libnx/include/",
+                "${DEVKITPRO}/portlibs/switch/include/",
+                "${workspaceFolder}/sys-tune/nxExt/include/",
+                "${workspaceFolder}/sys-tune/source/",
+                "${workspaceFolder}/overlay/lib/include/",
+                "${workspaceFolder}/overlay/source/",
+                "${workspaceFolder}/ipc/",
+                "${workspaceFolder}/common/"
+            ],
+            "defines": ["__SWITCH__", "WANT_MP3", "WANT_FLAC", "WANT_WAV"],
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++23",
+            "compilerPath": "${DEVKITPRO}/devkitA64/bin/aarch64-none-elf-gcc"
+        }
+    ],
+    "version": 4
+}

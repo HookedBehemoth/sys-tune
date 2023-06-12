@@ -2,6 +2,9 @@
 #include "tune.h"
 #include "gui_error.hpp"
 #include "gui_main.hpp"
+#include "sdmc/sdmc.hpp"
+#include "pm/pm.hpp"
+#include "config/config.hpp"
 
 #include <tesla.hpp>
 
@@ -40,6 +43,16 @@ class OverlayTest : public tsl::Overlay {
             return;
         }
 
+        if (R_FAILED(sdmc::Open())) {
+            this->msg  = "Failed sdmc::Open()";
+            return;
+        }
+
+        if (R_FAILED(pm::Initialize())) {
+            this->msg  = "Failed pm::Initialize()";
+            return;
+        }
+
         u32 api;
         if (R_FAILED(tuneGetApiVersion(&api)) || api != TUNE_API_VERSION) {
             this->msg = "   Unsupported\n"
@@ -47,6 +60,8 @@ class OverlayTest : public tsl::Overlay {
         }
     }
     virtual void exitServices() override {
+        sdmc::Close();
+        pm::Exit();
         tuneExit();
     }
 
