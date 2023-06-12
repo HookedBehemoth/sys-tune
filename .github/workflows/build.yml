@@ -3,17 +3,27 @@ name: Build sys-tune and overlay
 on: [push]
 jobs:
   build:
-  
+
     runs-on: ubuntu-latest
-    container: devkitpro/devkita64
+    container: devkitpro/devkita64:latest
 
     steps:
-    - uses: actions/checkout@v1
+    - name: Checkout
+      uses: actions/checkout@master
+      with:
+        submodules: recursive
 
-    - name: Building libnx-Ext
+    - name: Build
       run: |
-        make -j$(nproc) -C sys-tune/nxExt
+        make dist -j$(nproc)
+        mkdir -p dist/switch/.overlays
+        mkdir -p dist/atmosphere/contents/4200000000000000/flags
+        touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
+        cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
+        cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/
+        cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 
-    - name: Building sys-tune
-      run: |
-        API_VERSION=9 make -j$(nproc)
+    - uses: actions/upload-artifact@master
+      with:
+        name: sys-tune
+        path: dist

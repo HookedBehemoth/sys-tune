@@ -20,6 +20,7 @@ namespace tune::impl {
     void TuneThreadFunc(void *);
     void PscmThreadFunc(void *ptr);
     void GpioThreadFunc(void *ptr);
+    void PmdmntThreadFunc(void *ptr);
 
     bool GetStatus();
     void Play();

@@ -1,6 +1,6 @@
 #include "source.hpp"
 
-#include "sdmc.hpp"
+#include "sdmc/sdmc.hpp"
 
 #include <cstring>
 #include <strings.h>

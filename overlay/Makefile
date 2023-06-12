@@ -41,9 +41,9 @@ APP_TITLE	:=	sys-tune overlay
 
 TARGET		:=	sys-tune-overlay
 BUILD		:=	build
-SOURCES		:=	source ../ipc
+SOURCES		:=	source ../ipc ../common/minIni ../common/sdmc ../common/config ../common/pm
 DATA		:=	data
-INCLUDES	:=	lib/include ../ipc
+INCLUDES	:=	lib/include ../ipc ../common
 APP_VERSION	:=	$(VERSION)
 NO_ICON		:=  1
 
@@ -70,13 +70,13 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -Wno-format-truncation -O3 -ffunction-sections \
+CFLAGS	:=	-g -Wall -Wno-format-truncation -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
 CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION) \
 			$(WANT_FLAGS)
 
-CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
+CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=gnu++23
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -203,7 +203,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 all	:	 $(OUTPUT).ovl
 
-$(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp 
+$(OUTPUT).ovl		:	$(OUTPUT).elf $(OUTPUT).nacp
 	@elf2nro $< $@ $(NROFLAGS)
 	@echo "built ... $(notdir $(OUTPUT).ovl)"
 
