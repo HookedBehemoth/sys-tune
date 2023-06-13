@@ -137,17 +137,25 @@ namespace tune::impl {
             rc = audrvUpdate(&g_drv);
             if (R_SUCCEEDED(rc)) {
                 rc = audrenStartAudioRenderer();
-                if (R_SUCCEEDED(rc))
+                if (R_SUCCEEDED(rc)) {
+                    /* Fetch values from config, sanitize the return value */
+                    if (auto c = config::get_repeat(); c <= 2 && c >= 0) {
+                        SetRepeatMode(static_cast<RepeatMode>(c));
+                    }
+                    if (auto c = config::get_shuffle(); c == true || c == false) {
+                        SetShuffleMode(static_cast<ShuffleMode>(c));
+                    }
+                    if (auto c = config::get_volume(); c <= 20 && c >= 0) {
+                        SetVolume((float(c) / 20.f) * 2.f);
+                    }
                     return 0;
+                }
             } else {
                 /* Cleanup on failure */
                 audrvClose(&g_drv);
             }
         }
 
-        g_repeat = static_cast<RepeatMode>(config::get_repeat());
-        g_shuffle = static_cast<ShuffleMode>(config::get_shuffle());
-        g_drv.in_mixes[0].volume = (float(config::get_volume()) / 20) * 2;
         return rc;
     }
 
@@ -201,6 +209,7 @@ namespace tune::impl {
 
     void PscmThreadFunc(void *ptr) {
         PscPmModule *module = static_cast<PscPmModule *>(ptr);
+        bool previous_state{};
 
         while (should_run) {
             Result rc = eventWait(&module->event, 10'000'000);
@@ -213,7 +222,15 @@ namespace tune::impl {
             u32 flags;
             R_ABORT_UNLESS(pscPmModuleGetRequest(module, &state, &flags));
             switch (state) {
+                // NOTE: PscPmState_Awake event seems to get missed (rare) or
+                // PscPmState_ReadySleep is sent multiple times.
+                // todo: fade in and delay playback on wakeup slightly
+                case PscPmState_ReadyAwaken:
+                    should_pause = previous_state;
+                    break;
+                // pause on sleep
                 case PscPmState_ReadySleep:
+                    previous_state = should_pause;
                     should_pause = true;
                     break;
                 default:
