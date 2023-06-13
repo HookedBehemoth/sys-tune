@@ -20,26 +20,26 @@ void create_config_dir() {
 } // namespace
 
 auto get_title_default() -> bool {
-    return ini_getbool("config", "default", true, CONFIG_PATH);
+    return ini_getbool("title", "default", true, CONFIG_PATH);
 }
 
 void set_title_default(bool value) {
     create_config_dir();
-    ini_putl("config", "default", value, CONFIG_PATH);
+    ini_putl("title", "default", value, CONFIG_PATH);
 }
 
 auto get_title(u64 tid, bool load_default) -> bool {
     char id_buf[21]{};
     std::sprintf(id_buf, "%016lx", tid);
     const auto default_value = load_default ? get_title_default() : true;
-    return ini_getbool("config", id_buf, default_value, CONFIG_PATH);
+    return ini_getbool("title", id_buf, default_value, CONFIG_PATH);
 }
 
 void set_title(u64 tid, bool value) {
     create_config_dir();
     char id_buf[21]{};
     std::sprintf(id_buf, "%016lx", tid);
-    ini_putl("config", id_buf, value, CONFIG_PATH);
+    ini_putl("title", id_buf, value, CONFIG_PATH);
 }
 
 auto get_shuffle() -> bool {
