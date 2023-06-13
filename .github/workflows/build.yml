@@ -15,7 +15,7 @@ jobs:
 
     - name: Build
       run: |
-        make dist -j$(nproc)
+        make -j$(nproc)
         mkdir -p dist/switch/.overlays
         mkdir -p dist/atmosphere/contents/4200000000000000/flags
         touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
