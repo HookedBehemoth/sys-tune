@@ -8,7 +8,7 @@
  * @brief The base frame which can contain another view
  *
  */
-class SysTuneOverlayFrame : public tsl::elm::Element {
+class SysTuneOverlayFrame final : public tsl::elm::Element {
 public:
     /**
      * @brief Constructor
@@ -17,9 +17,8 @@ public:
      * @param subtitle Subtitle drawn bellow the title e.g version number
      */
     SysTuneOverlayFrame() : tsl::elm::Element() {}
-    virtual ~SysTuneOverlayFrame() {}
 
-    virtual void draw(tsl::gfx::Renderer *renderer) override {
+    void draw(tsl::gfx::Renderer *renderer) override {
         renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
         renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
@@ -38,7 +37,7 @@ public:
             s32 height = 110;
             s32 startX = 10;
             s32 startY = tsl::cfg::FramebufferHeight - height;
-            
+
             u32 fadeDuration = 10;
             if (m_toast->Current < fadeDuration) {
                 s32 offset = height - (height / fadeDuration) * m_toast->Current;
@@ -59,7 +58,7 @@ public:
         }
     }
 
-    virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+    void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
         setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
         if (m_contentElement != nullptr) {
@@ -68,14 +67,14 @@ public:
         }
     }
 
-    virtual Element* requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) override {
+    Element* requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) override {
         if (m_contentElement != nullptr)
             return m_contentElement->requestFocus(oldFocus, direction);
         else
             return nullptr;
     }
 
-    virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+    bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
         // Discard touches outside bounds
         if (!m_contentElement->inBounds(currX, currY))
             return false;
@@ -117,6 +116,6 @@ public:
 private:
     std::unique_ptr<tsl::elm::Element> m_contentElement;
     const char *m_description = "\uE0E1  Back     \uE0E0  OK";
-    
+
     std::optional<Toast> m_toast;
 };

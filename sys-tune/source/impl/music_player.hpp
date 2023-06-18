@@ -1,20 +1,18 @@
 #pragma once
 
 #include "../tune_types.hpp"
-
-/* Default audio config. */
-constexpr const AudioRendererConfig audren_cfg = {
-    .output_rate = AudioRendererOutputRate_48kHz,
-    .num_voices = 4,
-    .num_effects = 0,
-    .num_sinks = 1,
-    .num_mix_objs = 1,
-    .num_mix_buffers = 2,
-};
+#include <string>
+#include <vector>
 
 namespace tune::impl {
+    using PlaylistID = u32;
 
-    Result Initialize();
+    struct PlaylistEntry {
+        std::string path;
+        PlaylistID id;
+    };
+
+    Result Initialize(std::vector<PlaylistEntry>* playlist, std::vector<PlaylistID>* shuffle, PlaylistEntry* current);
     void Exit();
 
     void TuneThreadFunc(void *);
@@ -30,6 +28,15 @@ namespace tune::impl {
 
     float GetVolume();
     void SetVolume(float volume);
+    float GetTitleVolume();
+    void SetTitleVolume(float volume);
+    float GetDefaultTitleVolume();
+    void SetDefaultTitleVolume(float volume);
+
+    void TitlePlay();
+    void TitlePause();
+    void DefaultTitlePlay();
+    void DefaultTitlePause();
 
     RepeatMode GetRepeatMode();
     void SetRepeatMode(RepeatMode mode);

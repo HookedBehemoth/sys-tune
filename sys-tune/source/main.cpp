@@ -1,6 +1,7 @@
 #include "impl/music_player.hpp"
 #include "sdmc/sdmc.hpp"
 #include "pm/pm.hpp"
+#include "impl/aud_wrapper.h"
 #include "impl/source.hpp"
 #include "tune_service.hpp"
 #include "tune_result.hpp"
@@ -9,25 +10,24 @@ extern "C" {
 u32 __nx_applet_type     = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 
-#define INNER_HEAP_SIZE 0x60000
-size_t nx_inner_heap_size = INNER_HEAP_SIZE;
-char nx_inner_heap[INNER_HEAP_SIZE];
-
-void __libnx_initheap(void);
-void __appInit(void);
-void __appExit(void);
-}
+// do not decrease this, will either cause fatal or will fail to start
+// - 1024 * 216: needed for sys-tune to boot
+// - 1024 * 236: base
+// - 1024 * 268: needed for mp3 playback (at 32kb)
+// - 1024 * 300: needed for mp3 playback (at 64kb)
+// - 1024 * 332: needed for mp3 playback (at 96kb)
+// - 1024 * 364: needed for closing / reopening audrv and audren (mp3 at 0kb)
+// - 1024 * 460: needed for closing / reopening audrv and audren (mp3 at 96kb)
+#define INNER_HEAP_SIZE 1024 * (364 + MP3_CHUNK_SIZE_KB)
 
 void __libnx_initheap(void) {
-    void *addr  = nx_inner_heap;
-    size_t size = nx_inner_heap_size;
-
-    /* Newlib */
+    static char inner_heap[INNER_HEAP_SIZE];
     extern char *fake_heap_start;
     extern char *fake_heap_end;
 
-    fake_heap_start = (char *)addr;
-    fake_heap_end   = (char *)addr + size;
+    // Configure the newlib heap.
+    fake_heap_start = inner_heap;
+    fake_heap_end   = inner_heap + sizeof(inner_heap);
 }
 
 void __appInit() {
@@ -42,8 +42,8 @@ void __appInit() {
 
     R_ABORT_UNLESS(gpioInitialize());
     R_ABORT_UNLESS(pscmInitialize());
-    R_ABORT_UNLESS(audrenInitialize(&audren_cfg));
     R_ABORT_UNLESS(fsInitialize());
+    R_ABORT_UNLESS(audWrapperInitialize());
     R_ABORT_UNLESS(pm::Initialize());
     R_ABORT_UNLESS(sdmc::Open());
     smExit();
@@ -52,12 +52,13 @@ void __appInit() {
 void __appExit(void) {
     sdmc::Close();
     pm::Exit();
-
+    audWrapperExit();
     fsExit();
-    audrenExit();
     pscmExit();
     gpioExit();
 }
+
+} // extern "C"
 
 namespace {
 
@@ -69,7 +70,10 @@ namespace {
 }
 
 int main(int argc, char *argv[]) {
-    R_ABORT_UNLESS(tune::impl::Initialize());
+    std::vector<tune::impl::PlaylistEntry> playlist;
+    std::vector<tune::impl::PlaylistID> shuffle;
+    tune::impl::PlaylistEntry current;
+    R_ABORT_UNLESS(tune::impl::Initialize(&playlist, &shuffle, &current));
 
     /* Register audio as our dependency so we can pause before it prepares for sleep. */
     constexpr const u32 dependencies[] = { PscPmModuleId_Audio };

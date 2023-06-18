@@ -16,6 +16,7 @@ struct NxFile {
 #define INI_FILEPOS s64
 #define INI_OPENREWRITE
 #define INI_REMOVE
+#define INI_REAL float
 
 bool ini_openread(const char* filename, struct NxFile* nxfile);
 bool ini_openwrite(const char* filename, struct NxFile* nxfile);
@@ -27,6 +28,8 @@ bool ini_tell(struct NxFile* nxfile, s64* pos);
 bool ini_seek(struct NxFile* nxfile, s64* pos);
 bool ini_rename(const char* src, const char* dst);
 bool ini_remove(const char* filename);
+bool ini_ftoa(char* string, INI_REAL value);
+INI_REAL ini_atof(const char* string);
 
 #if defined __cplusplus
 } // extern "C" {

@@ -16,9 +16,8 @@ class BrowserGui final : public tsl::Gui {
     BrowserGui();
     ~BrowserGui();
 
-    virtual tsl::elm::Element *createUI() final;
-    virtual void update() final;
-    virtual bool handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogStickState, HidAnalogStickState) final;
+    tsl::elm::Element *createUI() override;
+    bool handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogStickState, HidAnalogStickState) override;
 
   private:
     void scanCwd();

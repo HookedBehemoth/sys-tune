@@ -12,7 +12,7 @@
 
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
-#define DRMP3_DATA_CHUNK_SIZE 0x4000 * 6
+#define DRMP3_DATA_CHUNK_SIZE (1024 * MP3_CHUNK_SIZE_KB)
 #include "dr_mp3.h"
 
 #define DR_WAV_IMPLEMENTATION
@@ -125,7 +125,7 @@ bool Source::Done() {
     return current == total;
 }
 
-class FlacFile : public Source {
+class FlacFile final : public Source {
   private:
     drflac *m_flac;
 
@@ -138,38 +138,38 @@ class FlacFile : public Source {
             drflac_close(this->m_flac);
     }
 
-    bool IsOpen() {
+    bool IsOpen() override {
         return this->m_flac != nullptr;
     }
 
-    size_t Decode(size_t sample_count, s16 *data) {
+    size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drflac_read_pcm_frames_s16(this->m_flac, sample_count, data);
     }
 
-    std::pair<u32, u32> Tell() {
+    std::pair<u32, u32> Tell() override {
         std::scoped_lock lk(this->m_mutex);
 
         return {this->m_flac->currentPCMFrame, this->m_flac->totalPCMFrameCount};
     }
 
-    bool Seek(u64 target) {
+    bool Seek(u64 target) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drflac_seek_to_pcm_frame(this->m_flac, target);
     }
 
-    int GetSampleRate() {
+    int GetSampleRate() override {
         return this->m_flac->sampleRate;
     }
 
-    int GetChannelCount() {
+    int GetChannelCount() override {
         return this->m_flac->channels;
     }
 };
 
-class Mp3File : public Source {
+class Mp3File final : public Source {
   private:
     drmp3 m_mp3;
     bool initialized;
@@ -187,38 +187,38 @@ class Mp3File : public Source {
             drmp3_uninit(&this->m_mp3);
     }
 
-    bool IsOpen() {
+    bool IsOpen() override {
         return initialized;
     }
 
-    size_t Decode(size_t sample_count, s16 *data) {
+    size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drmp3_read_pcm_frames_s16(&this->m_mp3, sample_count, data);
     }
 
-    std::pair<u32, u32> Tell() {
+    std::pair<u32, u32> Tell() override {
         std::scoped_lock lk(this->m_mutex);
 
         return {this->m_mp3.currentPCMFrame, this->m_total_frame_count};
     }
 
-    bool Seek(u64 target) {
+    bool Seek(u64 target) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drmp3_seek_to_pcm_frame(&this->m_mp3, target);
     }
 
-    int GetSampleRate() {
+    int GetSampleRate() override {
         return this->m_mp3.sampleRate;
     }
 
-    int GetChannelCount() {
+    int GetChannelCount() override {
         return this->m_mp3.channels;
     }
 };
 
-class WavFile : public Source {
+class WavFile final : public Source {
   private:
     drwav m_wav;
     bool initialized;
@@ -236,40 +236,40 @@ class WavFile : public Source {
             drwav_uninit(&this->m_wav);
     }
 
-    bool IsOpen() {
+    bool IsOpen() override {
         return initialized;
     }
 
-    size_t Decode(size_t sample_count, s16 *data) {
+    size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drwav_read_pcm_frames_s16(&this->m_wav, sample_count, data);
     }
 
-    std::pair<u32, u32> Tell() {
+    std::pair<u32, u32> Tell() override {
         std::scoped_lock lk(this->m_mutex);
 
         u64 byte_position = this->m_wav.dataChunkDataSize - this->m_wav.bytesRemaining;
         return {byte_position / this->m_bytes_per_pcm, this->m_wav.totalPCMFrameCount};
     }
 
-    bool Seek(u64 target) {
+    bool Seek(u64 target) override {
         std::scoped_lock lk(this->m_mutex);
 
         return drwav_seek_to_pcm_frame(&this->m_wav, target);
     }
 
-    int GetSampleRate() {
+    int GetSampleRate() override {
         return this->m_wav.sampleRate;
     }
 
-    int GetChannelCount() {
+    int GetChannelCount() override {
         return this->m_wav.channels;
     }
 };
 
-Source *OpenFile(const char *path) {
-    size_t length = std::strlen(path);
+std::unique_ptr<Source> OpenFile(const char *path) {
+    const auto length = std::strlen(path);
     if (length < 5)
         return nullptr;
 
@@ -278,27 +278,24 @@ Source *OpenFile(const char *path) {
     if (R_FAILED(sdmc::OpenFile(&file, path)))
         return nullptr;
 
-    Source *source = nullptr;
-
     if (false) {}
 #ifdef WANT_MP3
     else if (strcasecmp(path + length - 4, ".mp3") == 0) {
-        source = new (std::nothrow) Mp3File(std::move(file));
+        return std::make_unique<Mp3File>(std::move(file));
     }
 #endif
 #ifdef WANT_FLAC
     else if (strcasecmp(path + length - 5, ".flac") == 0) {
-        source = new (std::nothrow) FlacFile(std::move(file));
+        return std::make_unique<FlacFile>(std::move(file));
     }
 #endif
 #ifdef WANT_WAV
     else if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
-        source = new (std::nothrow) WavFile(std::move(file));
+        return std::make_unique<WavFile>(std::move(file));
     }
 #endif
-
-    if (source == nullptr)
+    else {
         fsFileClose(&file);
-
-    return source;
+        return nullptr;
+    }
 }

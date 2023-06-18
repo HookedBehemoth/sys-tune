@@ -16,12 +16,12 @@ namespace {
         }
     }
 
-    class ButtonListItem : public tsl::elm::ListItem {
+    class ButtonListItem final : public tsl::elm::ListItem {
       public:
         template <typename Text, typename Value>
         ButtonListItem(Text &text, Value &value) : ListItem(std::forward<Text>(text), std::forward<Value>(value)) {}
 
-        virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+        bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
             if (event == tsl::elm::TouchEvent::Touch)
                 this->m_touched = this->inBounds(currX, currY);
 
@@ -80,7 +80,7 @@ PlaylistGui::PlaylistGui() {
                 break;
             }
         }
-        auto *item = new ButtonListItem(str, "\uE098");
+        auto item = new ButtonListItem(str, "\uE098");
         item->setClickListener([this, item](u64 keys) -> bool {
             u32 index  = this->m_list->getIndexInList(item);
             u8 counter = 0;
@@ -92,7 +92,7 @@ PlaylistGui::PlaylistGui() {
                 if (R_SUCCEEDED(tuneRemove(index))) {
                     this->removeFocus();
                     this->m_list->removeIndex(index);
-                    auto *element = this->m_list->getItemAtIndex(index + 1);
+                    auto element = this->m_list->getItemAtIndex(index + 1);
                     if (element != nullptr) {
                         this->requestFocus(element, tsl::FocusDirection::Down);
                         this->m_list->setFocusedIndex(index + 1);

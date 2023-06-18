@@ -36,10 +36,12 @@ namespace {
         return false;
     }
 
-}
-constexpr const char *const base_path = "/music/";
+    constexpr const char *const base_path = "/music/";
 
-char path_buffer[FS_MAX_PATH];
+    char path_buffer[FS_MAX_PATH];
+
+} // namespace
+
 
 BrowserGui::BrowserGui()
     : m_fs(), has_music(), cwd("/") {
@@ -76,8 +78,6 @@ tsl::elm::Element *BrowserGui::createUI() {
     return m_frame;
 }
 
-void BrowserGui::update() {
-}
 bool BrowserGui::handleInput(u64 keysDown, u64, const HidTouchState&, HidAnalogStickState, HidAnalogStickState) {
     if (keysDown & HidNpadButton_B) {
         if (this->has_music && this->cwd[7] == '\0') {
@@ -120,7 +120,7 @@ void BrowserGui::scanCwd() {
     while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count) {
         if (entry.type == FsDirEntryType_Dir) {
             /* Add directory entries. */
-            auto *item = new tsl::elm::ListItem(entry.name);
+            auto item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
                     std::strncat(this->cwd, item->getText().c_str(), sizeof(this->cwd) - 1);
@@ -133,7 +133,7 @@ void BrowserGui::scanCwd() {
             folders.push_back(item);
         } else if (SupportsType(entry.name)) {
             /* Add file entry. */
-            auto *item = new tsl::elm::ListItem(entry.name);
+            auto item = new tsl::elm::ListItem(entry.name);
             item->setClickListener([this, item](u64 down) -> bool {
                 if (down & HidNpadButton_A) {
                     std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
@@ -193,8 +193,8 @@ void BrowserGui::addAllToPlaylist() {
         return;
     }
     tsl::hlp::ScopeGuard dirGuard([&] { fsDirClose(&dir); });
-    
-    std::vector<std::string> file_list; 
+
+    std::vector<std::string> file_list;
     s64 songs_added = 0;
     s64 count = 0;
     FsDirectoryEntry entry;

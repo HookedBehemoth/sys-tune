@@ -1,5 +1,5 @@
 export GITHASH 		:= $(shell git rev-parse --short HEAD)
-export VERSION 		:= 1.3.0
+export VERSION 		:= 2.0.0
 export API_VERSION 	:= 3
 export WANT_FLAC 	:= 1
 export WANT_MP3 	:= 1
@@ -25,8 +25,7 @@ module:
 
 dist: all
 	mkdir -p dist/switch/.overlays
-	mkdir -p dist/atmosphere/contents/4200000000000000/flags
-	touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
+	mkdir -p dist/atmosphere/contents/4200000000000000
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/

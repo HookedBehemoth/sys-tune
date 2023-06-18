@@ -39,7 +39,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/impl ../common/minIni ../common/sdmc ../common/config ../common/pm
+SOURCES		:=	source source/impl ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
 DATA		:=	data
 INCLUDES	:=	../ipc ../common
 
