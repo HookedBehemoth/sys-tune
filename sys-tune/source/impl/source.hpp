@@ -1,6 +1,10 @@
 #pragma once
 
 #include <nxExt.h>
+#include <memory>
+
+// number of kb to allocate for mp3 chunk
+#define MP3_CHUNK_SIZE_KB 96
 
 class Source {
   private:
@@ -29,4 +33,4 @@ class Source {
     virtual int GetChannelCount() = 0;
 };
 
-Source *OpenFile(const char *path);
+std::unique_ptr<Source> OpenFile(const char *path);

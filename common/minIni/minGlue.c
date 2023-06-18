@@ -1,5 +1,7 @@
 #include "minGlue.h"
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 static bool ini_open(const char* filename, struct NxFile* nxfile, u32 mode) {
     Result rc = {0};
@@ -124,4 +126,13 @@ bool ini_remove(const char* filename) {
     rc = fsFsDeleteFile(&fs, filename_buf);
     fsFsClose(&fs);
     return R_SUCCEEDED(rc);
+}
+
+bool ini_ftoa(char* string, INI_REAL value) {
+    sprintf(string,"%f",value);
+    return true;
+}
+
+INI_REAL ini_atof(const char* string) {
+    return strtof(string, NULL);
 }

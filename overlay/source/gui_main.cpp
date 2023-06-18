@@ -1,53 +1,32 @@
 #include "gui_main.hpp"
 
 #include "elm_overlayframe.hpp"
+#include "elm_volume.hpp"
 #include "gui_browser.hpp"
 #include "gui_playlist.hpp"
 #include "pm/pm.hpp"
 #include "config/config.hpp"
 
 namespace {
-
     constexpr const size_t num_steps = 20;
-    constexpr const float max_volume = 2;
-
-    void volumeCallback(u8 value) {
-        float music_volume = (float(value) / num_steps) * max_volume;
-        config::set_volume(value);
-        tuneSetVolume(music_volume);
-    }
-
 }
 
 MainGui::MainGui() {
     m_status_bar    = new StatusBar();
-    m_volume_slider = new tsl::elm::StepTrackBar("\uE13C", num_steps);
-    /* Get initial volume. */
-    float volume = 0;
-    if (R_SUCCEEDED(tuneGetVolume(&volume))) {
-        this->m_volume_slider->setProgress((volume / max_volume) * num_steps);
-        this->m_volume_slider->setValueChangedListener(volumeCallback);
-    } else {
-        this->m_volume_slider->setProgress(0);
-    }
 }
 
 tsl::elm::Element *MainGui::createUI() {
-    auto *frame = new SysTuneOverlayFrame();
-    auto *list  = new tsl::elm::List();
-    u64 tid{};
-    pm::PollCurrentTitle(tid);
-    const auto config_option = config::get_title(tid, false);
-    const auto default_option = config::get_title_default();
+    auto frame = new SysTuneOverlayFrame();
+    auto list  = new tsl::elm::List();
 
-    char id_buf[21]{};
-    std::sprintf(id_buf, "%016lx", tid);
+    u64 pid{}, tid{};
+    pm::getCurrentPidTid(pid, tid);
 
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
 
     /* Playlist. */
-    auto *queue_button = new tsl::elm::ListItem("Playlist");
+    auto queue_button = new tsl::elm::ListItem("Playlist");
     queue_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tsl::changeTo<PlaylistGui>();
@@ -58,7 +37,7 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(queue_button);
 
     /* Browser. */
-    auto *browser_button = new tsl::elm::ListItem("Music browser");
+    auto browser_button = new tsl::elm::ListItem("Music browser");
     browser_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tsl::changeTo<BrowserGui>();
@@ -69,28 +48,74 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(browser_button);
 
     /* Volume indicator */
-    list->addItem(this->m_volume_slider);
+    list->addItem(new tsl::elm::CategoryHeader("Volume Control"));
 
-    /* Title Config. */
-    auto title_config_item = new tsl::elm::ToggleListItem(std::string{""} + id_buf, config_option, "Play", "Pause");
-    title_config_item->setStateChangedListener([tid](bool new_value) {
-        config::set_title(tid, new_value);
+    /* Get initial volume. */
+    float tune_volume = 1.f;
+    float title_volume = 1.f;
+    float default_title_volume = 1.f;
+
+    tuneGetVolume(&tune_volume);
+    tuneGetTitleVolume(&title_volume);
+    tuneGetDefaultTitleVolume(&default_title_volume);
+
+    auto tune_volume_slider = new ElmVolume("\uE13C", "Tune Volume", num_steps);
+    tune_volume_slider->setProgress(tune_volume * num_steps);
+    tune_volume_slider->setValueChangedListener([](u8 value){
+        const float volume = float(value) / float(num_steps);
+        tuneSetVolume(volume);
+    });
+    list->addItem(tune_volume_slider);
+
+    // empty pid means we are qlaunch :)
+    if (tid && pid) {
+        auto title_volume_slider = new ElmVolume("\uE13C", "Game Volume", num_steps);
+        title_volume_slider->setProgress(title_volume * num_steps);
+        title_volume_slider->setValueChangedListener([tid](u8 value){
+            const float volume = float(value) / float(num_steps);
+            tuneSetTitleVolume(volume);
+            config::set_title_volume(tid, volume);
+        });
+        list->addItem(title_volume_slider);
+    }
+
+    auto default_title_volume_slider = new ElmVolume("\uE13C", "Game Volume (default)", num_steps);
+    default_title_volume_slider->setProgress(default_title_volume * num_steps);
+    default_title_volume_slider->setValueChangedListener([](u8 value){
+        const float volume = float(value) / float(num_steps);
+        tuneSetDefaultTitleVolume(volume);
+    });
+    list->addItem(default_title_volume_slider);
+
+    list->addItem(new tsl::elm::CategoryHeader("Play / Pause"));
+
+    /* Per title tune toggle. */
+    auto tune_play = new tsl::elm::ToggleListItem("Tune", config::get_title_enabled(tid), "Play", "Pause");
+    tune_play->setStateChangedListener([tid](bool new_value) {
+        config::set_title_enabled(tid, new_value);
         if (new_value) {
             tunePlay();
         } else {
             tunePause();
         }
     });
-    list->addItem(title_config_item);
+    list->addItem(tune_play);
 
-    /* Default Config. */
-    auto default_config_item = new tsl::elm::ToggleListItem("Global default", default_option, "Play", "Pause");
-    default_config_item->setStateChangedListener([](bool new_value) {
-        config::set_title_default(new_value);
+    /* Default title tune toggle. */
+    auto tune_default_play = new tsl::elm::ToggleListItem("Tune (default)", config::get_title_enabled_default(), "Play", "Pause");
+    tune_default_play->setStateChangedListener([](bool new_value) {
+        config::set_title_enabled_default(new_value);
+        if (new_value) {
+            tunePlay();
+        } else {
+            tunePause();
+        }
     });
-    list->addItem(default_config_item);
+    list->addItem(tune_default_play);
 
-    auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
+    list->addItem(new tsl::elm::CategoryHeader("Misc"));
+
+    auto exit_button = new tsl::elm::ListItem("Close sys-tune");
     exit_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tuneQuit();

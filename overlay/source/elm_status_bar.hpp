@@ -5,7 +5,7 @@
 
 #include <tesla.hpp>
 
-class StatusBar : public tsl::elm::Element {
+class StatusBar final : public tsl::elm::Element {
   private:
     bool m_playing;
     TuneRepeatMode m_repeat;
@@ -26,11 +26,11 @@ class StatusBar : public tsl::elm::Element {
   public:
     StatusBar();
 
-    virtual tsl::elm::Element *requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) final;
-    virtual void draw(tsl::gfx::Renderer *renderer) final;
-    virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) final;
-    virtual bool onClick(u64 keys) final;
-    virtual bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) final;
+    tsl::elm::Element *requestFocus(tsl::elm::Element *oldFocus, tsl::FocusDirection direction) override;
+    void draw(tsl::gfx::Renderer *renderer) override;
+    void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override;
+    bool onClick(u64 keys) override;
+    bool onTouch(tsl::elm::TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override;
 
     void update();
 

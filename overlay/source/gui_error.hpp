@@ -11,5 +11,5 @@ class ErrorGui final : public tsl::Gui {
   public:
     ErrorGui(const char *msg, Result rc);
 
-    virtual tsl::elm::Element *createUI() final;
+    tsl::elm::Element *createUI() override;
 };

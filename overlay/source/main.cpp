@@ -8,13 +8,29 @@
 
 #include <tesla.hpp>
 
-class OverlayTest : public tsl::Overlay {
+class SysTuneOverlay final : public tsl::Overlay {
   private:
     const char *msg = nullptr;
     Result fail     = 0;
 
   public:
-    virtual void initServices() override {
+    void initServices() override {
+        if (R_FAILED(pm::Initialize())) {
+            this->msg  = "Failed pm::Initialize()";
+            return;
+        }
+
+        // don't open sys-tune if blacklisted title is active!
+        u64 pid{}, tid{};
+        pm::getCurrentPidTid(pid, tid);
+
+        if (config::get_title_blacklist(tid)) {
+            this->msg =
+                "Title is blacklisted!\n"
+                "Exit to use sys-tune";
+            return;
+        }
+
         Result rc = tuneInitialize();
 
         if (R_VALUE(rc) == KERNELRESULT(NotFound)) {
@@ -24,16 +40,17 @@ class OverlayTest : public tsl::Overlay {
                 .storageID  = NcmStorageId_None,
             };
             rc = pmshellInitialize();
-            if (R_SUCCEEDED(rc))
+            if (R_SUCCEEDED(rc)) {
                 rc = pmshellLaunchProgram(0, &programLocation, &pid);
-            pmshellExit();
+                pmshellExit();
+            }
             if (R_FAILED(rc) || pid == 0) {
                 this->fail = rc;
                 this->msg  = "  Failed to\n"
                             "launch sysmodule";
                 return;
             }
-            svcSleepThread(100'000'000);
+            svcSleepThread(500'000'000ULL);
             rc = tuneInitialize();
         }
 
@@ -48,27 +65,20 @@ class OverlayTest : public tsl::Overlay {
             return;
         }
 
-        if (R_FAILED(pm::Initialize())) {
-            this->msg  = "Failed pm::Initialize()";
-            return;
-        }
-
         u32 api;
         if (R_FAILED(tuneGetApiVersion(&api)) || api != TUNE_API_VERSION) {
             this->msg = "   Unsupported\n"
                         "sys-tune version!";
         }
     }
-    virtual void exitServices() override {
+
+    void exitServices() override {
         sdmc::Close();
         pm::Exit();
         tuneExit();
     }
 
-    virtual void onShow() override {}
-    virtual void onHide() override {}
-
-    virtual std::unique_ptr<tsl::Gui> loadInitialGui() override {
+    std::unique_ptr<tsl::Gui> loadInitialGui() override {
         if (this->msg) {
             return std::make_unique<ErrorGui>(this->msg, this->fail);
         } else {
@@ -78,5 +88,5 @@ class OverlayTest : public tsl::Overlay {
 };
 
 int main(int argc, char **argv) {
-    return tsl::loop<OverlayTest>(argc, argv);
+    return tsl::loop<SysTuneOverlay>(argc, argv);
 }

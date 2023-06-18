@@ -57,6 +57,18 @@ namespace tune {
                 case TuneIpcCmd_SetVolume:
                     SET_SINGLE(float, impl::SetVolume);
 
+                case TuneIpcCmd_GetTitleVolume:
+                    GET_SINGLE(float, impl::GetTitleVolume);
+
+                case TuneIpcCmd_SetTitleVolume:
+                    SET_SINGLE(float, impl::SetTitleVolume);
+
+                case TuneIpcCmd_GetDefaultTitleVolume:
+                    GET_SINGLE(float, impl::GetDefaultTitleVolume);
+
+                case TuneIpcCmd_SetDefaultTitleVolume:
+                    SET_SINGLE(float, impl::SetDefaultTitleVolume);
+
                 case TuneIpcCmd_GetRepeatMode:
                     GET_SINGLE(RepeatMode, impl::GetRepeatMode);
 

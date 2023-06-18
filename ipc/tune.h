@@ -64,6 +64,30 @@ Result tuneGetVolume(float *out);
 Result tuneSetVolume(float volume);
 
 /**
+ * @brief Get the volume of the current title
+ * @param[out] out volume value (linear factor).
+ */
+Result tuneGetTitleVolume(float *out);
+
+/**
+ * @brief Set the volume of the current title
+ * @param[in] volume volume value (linear factor).
+ */
+Result tuneSetTitleVolume(float volume);
+
+/**
+ * @brief Get the default volume of all titles
+ * @param[out] out volume value (linear factor).
+ */
+Result tuneGetDefaultTitleVolume(float *out);
+
+/**
+ * @brief Set the default volume of all titles
+ * @param[in] volume volume value (linear factor).
+ */
+Result tuneSetDefaultTitleVolume(float volume);
+
+/**
  * @brief Get the current loop status.
  * @param[out] state \ref TuneRepeatMode
  */

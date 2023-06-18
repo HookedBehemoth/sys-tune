@@ -41,7 +41,7 @@ APP_TITLE	:=	sys-tune
 
 TARGET		:=	sys-tune-overlay
 BUILD		:=	build
-SOURCES		:=	source ../ipc ../common/minIni ../common/sdmc ../common/config ../common/pm
+SOURCES		:=	source ../ipc ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
 DATA		:=	data
 INCLUDES	:=	lib/include ../ipc ../common
 APP_VERSION	:=	$(VERSION)

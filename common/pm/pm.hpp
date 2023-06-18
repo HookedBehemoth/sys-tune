@@ -6,6 +6,7 @@ namespace pm {
 
 auto Initialize() -> Result;
 void Exit();
-auto PollCurrentTitle(u64& title_id_out) -> bool;
+void getCurrentPidTid(u64& pid_out, u64& tid_out);
+auto PollCurrentPidTid(u64& pid_out, u64& tid_out) -> bool;
 
 } // namespace pm

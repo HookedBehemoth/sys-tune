@@ -17,6 +17,7 @@ You can manage playback via the Tesla overlay in the release.
 ## Special thanks to:
 - [mackron](http://mackron.github.io/) who made the awesome [audio decoders used here.](https://github.com/mackron/dr_libs/)
 - [WerWolv](https://werwolv.net/) for making libtesla, the UI library used for the control overlay.
+- [TotalJustice](https://github.com/ITotalJustice) for bug fixes, adding some features and bad code.
 
 ## Info for developers
 I implemented an IPC interface accessible via service wrappers [here](/ipc/).
