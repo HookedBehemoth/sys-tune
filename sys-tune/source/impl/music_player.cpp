@@ -233,6 +233,7 @@ namespace tune::impl {
 
         // tldr, most fancy things made by N will fatal
         const u64 blacklist[] = {
+            // https://github.com/HookedBehemoth/sys-tune/issues/10
             0x010077B00E046000, // spyro reignited trilogy
             0x0100AD9012510000, // pac man 99
             0x01006C100EC08000, // minecraft dugeons
@@ -249,6 +250,39 @@ namespace tune::impl {
             0x0100C62011050000, // GB NSO
             0x010012F017576000, // GBA NSO
             0x0100C9A00ECE6000, // N64 NSO
+
+            // https://github.com/tallbl0nde/TriPlayer/issues/31
+            0x0100E5600D446000, // Ni No Kuni: Wrath of the White Witch
+            0x0100A3900C3E2000, // Paper Mario™: The Origami King
+            0x0100626011656000, // The Outer Worlds
+            0x010090F012916000, // Ghostrunner
+            0x0100F15012D36000, // IMMERSE LAND
+            0x01005950022EC000, // Blade Strangers
+            0x0100423009358000, // Death Road to Canada
+            0x010044500C182000, // Sid Meier's Civilization VI
+
+            // anything made by PROTOTYPE
+            0x0100A3A00CC7E000, // CLANNAD
+            0x01007B501372C000, // CLANNAD Side Stories
+            0x01003B300E4AA000, // THE GRISAIA TRILOGY
+            0x0100F06013710000, // ISLAND
+            0x0100BD100C752000, // planetarian
+            0x01002330123BC000, // GRISAIA PHANTOM TRIGGER 05
+            0x0100240013AE8000, // GRISAIA PHANTOM TRIGGER 06
+            0x01002EF014DA2000, // GRISAIA PHANTOM TRIGGER 07
+            0x0100398010314000, // Tomoyo After -It's a Wonderful Life- CS Edition
+            0x01004AB0133E8000, // GRISAIA PHANTOM TRIGGER 01 to 05
+            0x01005250123B8000, // GRISAIA PHANTOM TRIGGER 03
+            0x010054101370E000, // FATAL TWELVE
+            0x010062A0178A8000, // LOOPERS
+            0x0100806017562000, // OshiRabu: Waifus Over Husbandos + Love･or･die
+            0x0100943010310000, // Little Busters! Converted Edition
+            0x010096000CA38000, // TAISHO x ALICE ALL IN ONE
+            0x0100A1200CA3C000, // Butterfly's Poison; Blood Chains
+            0x0100C38019CE4000, // GRISAIA PHANTOM TRIGGER 08
+            0x0100C9C0178A6000, // Harmonia
+            0x0100CAF013AE6000, // GRISAIA PHANTOM TRIGGER 5.5
+            0x0100D970123BA000, // GRISAIA PHANTOM TRIGGER 04
         };
 
         // do this on startup because the user may not copy a config
