@@ -6,7 +6,7 @@ namespace {
 
     char result_buffer[10];
 
-} // namespace
+}
 
 ErrorGui::ErrorGui(const char *msg, Result rc) : m_msg(msg) {
     if (rc) {

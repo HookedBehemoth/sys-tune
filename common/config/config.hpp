@@ -38,4 +38,4 @@ void set_default_title_volume(float value);
 auto get_title_blacklist(u64 tid) -> bool;
 void set_title_blacklist(u64 tid, bool value);
 
-} // namespace config
+}

@@ -22,7 +22,7 @@ class SysTuneOverlay final : public tsl::Overlay {
 
         // don't open sys-tune if blacklisted title is active!
         u64 pid{}, tid{};
-        pm::getCurrentPidTid(pid, tid);
+        pm::getCurrentPidTid(&pid, &tid);
 
         if (config::get_title_blacklist(tid)) {
             this->msg =
@@ -33,7 +33,9 @@ class SysTuneOverlay final : public tsl::Overlay {
 
         Result rc = tuneInitialize();
 
-        if (R_VALUE(rc) == KERNELRESULT(NotFound)) {
+        // not found can happen if the service isn't started
+        // connection refused can happen is the service was terminated by pmshell
+        if (R_VALUE(rc) == KERNELRESULT(NotFound) || KERNELRESULT(ConnectionRefused)) {
             u64 pid = 0;
             const NcmProgramLocation programLocation{
                 .program_id = 0x4200000000000000,
