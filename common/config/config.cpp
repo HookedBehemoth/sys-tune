@@ -29,7 +29,7 @@ auto get_tid_str(u64 tid) -> const char* {
     return buf;
 }
 
-} // namespace
+}
 
 auto get_shuffle() -> bool {
     return ini_getbool("config", "shuffle", false, CONFIG_PATH);
@@ -111,4 +111,4 @@ void set_title_blacklist(u64 tid, bool value) {
     ini_putl("blacklist", get_tid_str(tid), value, BLACKLIST_PATH);
 }
 
-} // namespace config
+}

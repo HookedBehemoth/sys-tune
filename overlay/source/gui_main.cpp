@@ -20,7 +20,7 @@ tsl::elm::Element *MainGui::createUI() {
     auto list  = new tsl::elm::List();
 
     u64 pid{}, tid{};
-    pm::getCurrentPidTid(pid, tid);
+    pm::getCurrentPidTid(&pid, &tid);
 
     /* Current track. */
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);

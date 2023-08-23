@@ -40,7 +40,7 @@ namespace {
 
     char path_buffer[FS_MAX_PATH];
 
-} // namespace
+}
 
 
 BrowserGui::BrowserGui()

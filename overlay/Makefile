@@ -76,7 +76,7 @@ CFLAGS	:=	-g -Wall -Wno-format-truncation -O2 -ffunction-sections \
 CFLAGS	+=	$(INCLUDE) -DVERSION=\"v$(APP_VERSION)\" -DTUNE_API_VERSION=$(API_VERSION) \
 			$(WANT_FLAGS)
 
-CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=gnu++23
+CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++23
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)

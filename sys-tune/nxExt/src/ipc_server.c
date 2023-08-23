@@ -23,6 +23,16 @@ Result ipcServerInit(IpcServer* server, const char* name, u32 max_sessions)
     server->count = 0;
 
     Result rc = svcManageNamedPort(&server->handles[0], server->srvName.name, max_sessions);
+    if (R_FAILED(rc))
+    {
+        rc = svcManageNamedPort(&server->handles[0], server->srvName.name, 0);
+        if(R_SUCCEEDED(rc))
+        {
+            svcCloseHandle(server->handles[0]);
+            rc = svcManageNamedPort(&server->handles[0], server->srvName.name, max_sessions);
+        }
+    }
+
     if(R_SUCCEEDED(rc))
     {
         server->count = 1;
@@ -201,4 +211,3 @@ Result ipcServerProcess(IpcServer* server, IpcServerRequestHandler handler, void
 
     return rc;
 }
-

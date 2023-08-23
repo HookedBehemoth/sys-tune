@@ -224,7 +224,7 @@ namespace tune::impl {
             return 0;
         }
 
-    } // namespace
+    }
 
     Result Initialize(std::vector<PlaylistEntry>* playlist, std::vector<PlaylistID>* shuffle, PlaylistEntry* current) {
         g_playlist = playlist;
@@ -444,7 +444,7 @@ namespace tune::impl {
 
         while (g_should_run) {
             u64 pid{}, new_tid{};
-            if (pm::PollCurrentPidTid(pid, new_tid)) {
+            if (pm::PollCurrentPidTid(&pid, &new_tid)) {
                 // check if title is blacklisted
                 g_close_audren = config::get_title_blacklist(new_tid);
 
