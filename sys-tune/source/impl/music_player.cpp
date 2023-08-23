@@ -438,10 +438,6 @@ namespace tune::impl {
     }
 
     void PmdmntThreadFunc(void *ptr) {
-        u64 previous_tid{};
-        u64 current_tid{};
-        bool previous_state{};
-
         while (g_should_run) {
             u64 pid{}, new_tid{};
             if (pm::PollCurrentPidTid(&pid, &new_tid)) {
@@ -455,20 +451,12 @@ namespace tune::impl {
                     SetTitleVolume(std::clamp(config::get_title_volume(new_tid), 0.f, VOLUME_MAX));
                 }
 
-                if (new_tid == previous_tid) {
-                    g_should_pause = previous_state;
+                // TODO: fade song in rather than abruptly playing to avoid jump scares
+                if (config::has_title_enabled(new_tid)) {
+                    g_should_pause = !config::get_title_enabled(new_tid);
                 } else {
-                    previous_state = g_should_pause;
-                    // TODO: fade song in rather than abruptly playing to avoid jump scares
-                    if (config::has_title_enabled(new_tid)) {
-                        g_should_pause = !config::get_title_enabled(new_tid);
-                    } else {
-                        g_should_pause = !config::get_title_enabled_default();
-                    }
+                    g_should_pause = !config::get_title_enabled_default();
                 }
-
-                previous_tid = current_tid;
-                current_tid = new_tid;
             }
 
             // sadly, we can't simply apply auda when the title changes
