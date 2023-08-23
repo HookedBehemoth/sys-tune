@@ -35,7 +35,7 @@ class SysTuneOverlay final : public tsl::Overlay {
 
         // not found can happen if the service isn't started
         // connection refused can happen is the service was terminated by pmshell
-        if (R_VALUE(rc) == KERNELRESULT(NotFound) || KERNELRESULT(ConnectionRefused)) {
+        if (R_VALUE(rc) == KERNELRESULT(NotFound) || R_VALUE(rc) == KERNELRESULT(ConnectionRefused)) {
             u64 pid = 0;
             const NcmProgramLocation programLocation{
                 .program_id = 0x4200000000000000,
