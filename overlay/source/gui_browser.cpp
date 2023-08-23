@@ -1,5 +1,8 @@
 #include "gui_browser.hpp"
 
+#include "i18n/i18n.hpp"
+#include "elm_category_header_sv.hpp"
+#include "elm_list_item_sv.hpp"
 #include "tune.h"
 
 namespace {
@@ -59,7 +62,7 @@ BrowserGui::BrowserGui()
         }
         this->scanCwd();
     } else {
-        this->m_list->addItem(new tsl::elm::CategoryHeader("Couldn't open SdCard"));
+        this->m_list->addItem(new CategoryHeaderSV("Couldn't open SdCard"_lang()));
     }
 }
 
@@ -70,7 +73,7 @@ BrowserGui::~BrowserGui() {
 tsl::elm::Element *BrowserGui::createUI() {
     m_frame = new SysTuneOverlayFrame();
 
-    m_frame->setDescription("\uE0E1  Back     \uE0E0  Add    \uE0E2  Add All");
+    m_frame->setDescription("\uE0E1  Back     \uE0E0  Add    \uE0E2  Add All"_lang());
     m_frame->setContent(this->m_list);
 
     return m_frame;
@@ -98,7 +101,7 @@ void BrowserGui::scanCwd() {
     this->m_list->clear();
 
     /* Show absolute folder path. */
-    this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
+    this->m_list->addItem(new CategoryHeaderSV(this->cwd, true));
 
     /* Open directory. */
     FsDir dir;
@@ -106,7 +109,7 @@ void BrowserGui::scanCwd() {
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
-        this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new ListItemSV("something went wrong :/"_lang()));
         this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
         return;
     }
@@ -139,9 +142,13 @@ void BrowserGui::scanCwd() {
                     std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
                     Result rc = tuneEnqueue(path_buffer, TuneEnqueueType_Back);
                     if (R_SUCCEEDED(rc)) {
-                        m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
+                        m_frame->setToast(
+                            "Playlist updated"_lang(),
+                            "Added a song to the Playlist"_lang());
                     } else {
-                        m_frame->setToast("Failed to add Track.", "Does the name contain umlauts?");
+                        m_frame->setToast(
+                            "Failed to add Track"_lang(),
+                            "Does the name contain umlauts?"_lang());
                     }
                     return true;
                 }
@@ -151,7 +158,7 @@ void BrowserGui::scanCwd() {
         }
     }
     if (folders.size() == 0 && files.size() == 0) {
-        this->m_list->addItem(new tsl::elm::CategoryHeader("Empty..."));
+        this->m_list->addItem(new CategoryHeaderSV("Empty..."_lang()));
         return;
     }
 
@@ -161,7 +168,7 @@ void BrowserGui::scanCwd() {
             this->m_list->addItem(element);
     }
     if (files.size() > 0) {
-        this->m_list->addItem(new tsl::elm::CategoryHeader("Files"));
+        this->m_list->addItem(new CategoryHeaderSV("Files"_lang()));
         std::sort(files.begin(), files.end(), ListItemTextCompare);
         for (auto element : files)
             this->m_list->addItem(element);
@@ -188,7 +195,7 @@ void BrowserGui::addAllToPlaylist() {
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
-        this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new ListItemSV("something went wrong :/"_lang()));
         this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
         return;
     }
@@ -212,6 +219,12 @@ void BrowserGui::addAllToPlaylist() {
         if (R_SUCCEEDED(rc)) songs_added++;
     }
 
-    std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist.", songs_added);
-    m_frame->setToast("Playlist updated", path_buffer);
+    if (songs_added == 1) {
+        m_frame->setToast(
+            "Playlist updated"_lang(),
+            "Added a song to the Playlist"_lang());
+    } else {
+        std::snprintf(path_buffer, sizeof(path_buffer), "Added %ld songs to Playlist"_lang().data(), songs_added);
+        m_frame->setToast("Playlist updated"_lang(), path_buffer);
+    }
 }

@@ -1,4 +1,5 @@
 #define TESLA_INIT_IMPL
+#include "i18n/i18n.hpp"
 #include "tune.h"
 #include "gui_error.hpp"
 #include "gui_main.hpp"
@@ -12,6 +13,8 @@ class OverlayTest : public tsl::Overlay {
 
   public:
     virtual void initServices() override {
+        i18n::init();
+
         Result rc = tuneInitialize();
 
         if (R_VALUE(rc) == KERNELRESULT(NotFound)) {

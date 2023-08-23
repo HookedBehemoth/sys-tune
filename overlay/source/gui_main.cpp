@@ -1,8 +1,10 @@
 #include "gui_main.hpp"
 
 #include "elm_overlayframe.hpp"
+#include "elm_list_item_sv.hpp"
 #include "gui_browser.hpp"
 #include "gui_playlist.hpp"
+#include "i18n/i18n.hpp"
 
 namespace {
 
@@ -37,7 +39,7 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(this->m_status_bar, tsl::style::ListItemDefaultHeight * 2);
 
     /* Playlist. */
-    auto *queue_button = new tsl::elm::ListItem("Playlist");
+    auto *queue_button = new ListItemSV("Playlist"_lang());
     queue_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tsl::changeTo<PlaylistGui>();
@@ -48,7 +50,7 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(queue_button);
 
     /* Browser. */
-    auto *browser_button = new tsl::elm::ListItem("Music browser");
+    auto *browser_button = new ListItemSV("Music browser"_lang());
     browser_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tsl::changeTo<BrowserGui>();
@@ -61,7 +63,7 @@ tsl::elm::Element *MainGui::createUI() {
     /* Volume indicator */
     list->addItem(this->m_volume_slider);
 
-    auto *exit_button = new tsl::elm::ListItem("Close sys-tune");
+    auto *exit_button = new ListItemSV("Close sys-tune"_lang());
     exit_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {
             tuneQuit();
@@ -73,6 +75,8 @@ tsl::elm::Element *MainGui::createUI() {
     list->addItem(exit_button);
 
     frame->setContent(list);
+
+    frame->setDescription("\uE0E1  Minimize  \uE0E0  OK"_lang());
 
     return frame;
 }

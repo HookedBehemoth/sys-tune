@@ -1,5 +1,6 @@
 #include "elm_status_bar.hpp"
 
+#include "i18n/i18n.hpp"
 #include "symbol.hpp"
 
 namespace {
@@ -224,7 +225,7 @@ void StatusBar::update() {
             }
         }
     } else {
-        this->m_current_track = "Stopped!";
+        this->m_current_track = "Stopped!"_lang();
         this->m_stats = {};
         /* Reset scrolling text */
         this->m_text_width = 0;

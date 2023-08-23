@@ -1,6 +1,8 @@
 #include "gui_playlist.hpp"
 
+#include "i18n/i18n.hpp"
 #include "elm_overlayframe.hpp"
+#include "elm_list_item_sv.hpp"
 #include "tune.h"
 
 namespace {
@@ -55,13 +57,13 @@ PlaylistGui::PlaylistGui() {
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
-        this->m_list->addItem(new tsl::elm::ListItem("something went wrong :/"));
+        this->m_list->addItem(new ListItemSV("something went wrong :/"_lang()));
         this->m_list->addItem(new tsl::elm::ListItem(result_buffer));
         return;
     }
 
     if (count == 0) {
-        m_list->addItem(new tsl::elm::ListItem("Playlist empty."));
+        m_list->addItem(new ListItemSV("Playlist empty"_lang()));
         return;
     }
 
@@ -115,7 +117,7 @@ tsl::elm::Element *PlaylistGui::createUI() {
     auto rootFrame = new SysTuneOverlayFrame();
 
     rootFrame->setContent(this->m_list);
-    rootFrame->setDescription("\uE0E1  Back     \uE0E0  Play   \uE0E3  Remove");
+    rootFrame->setDescription("\uE0E1  Back     \uE0E0  Play   \uE0E3  Remove"_lang());
 
     return rootFrame;
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "i18n/i18n.hpp"
+
 #include <tesla.hpp>
 #include <memory>
 #include <optional>
@@ -28,7 +30,7 @@ public:
 
         renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-        renderer->drawString(m_description, false, 30, 693, 23, a(tsl::style::color::ColorText));
+        renderer->drawString(m_description.data(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
         if (m_contentElement != nullptr)
             m_contentElement->frame(renderer);
@@ -51,8 +53,8 @@ public:
 
             renderer->drawRect(startX, startY, width, height, a(tsl::style::color::ColorText));
             renderer->drawRect(startX + 3, startY + 3, width - 6, height - 6, a(tsl::style::color::ColorFrameBackground));
-            renderer->drawString(m_toast->Header.c_str(), false, startX + 10, startY + 40, 26, a(tsl::style::color::ColorText));
-            renderer->drawString(m_toast->Content.c_str(), false, startX + 10, startY + 80, 23, a(tsl::style::color::ColorText), width - 20);
+            renderer->drawString(m_toast->Header.data(), false, startX + 10, startY + 40, 26, a(tsl::style::color::ColorText));
+            renderer->drawString(m_toast->Content.data(), false, startX + 10, startY + 80, 23, a(tsl::style::color::ColorText), width - 20);
 
             ++m_toast->Current;
             if (m_toast->Duration <= m_toast->Current) m_toast = std::nullopt;
@@ -99,24 +101,24 @@ public:
         }
     }
 
-    void setDescription(const char *description) {
+    void setDescription(std::string_view description) {
         m_description = description;
     }
 
     struct Toast {
-        std::string Header;
-        std::string Content;
+        std::string_view Header;
+        std::string_view Content;
         u32 Duration;
         u32 Current;
     };
 
-    void setToast(std::string header, std::string content) {
+    void setToast(std::string_view header, std::string_view content) {
         m_toast = Toast { header, content, 150, 0 };
     }
 
 private:
     std::unique_ptr<tsl::elm::Element> m_contentElement;
-    const char *m_description = "\uE0E1  Back     \uE0E0  OK";
+    std::string_view m_description = "\uE0E1  Back     \uE0E0  OK"_lang();
     
     std::optional<Toast> m_toast;
 };
