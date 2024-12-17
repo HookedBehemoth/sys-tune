@@ -34,8 +34,4 @@ void set_title_volume(u64 tid, float value);
 auto get_default_title_volume() -> float;
 void set_default_title_volume(float value);
 
-// returns true if title causes a fatal on launch
-auto get_title_blacklist(u64 tid) -> bool;
-void set_title_blacklist(u64 tid, bool value);
-
 }

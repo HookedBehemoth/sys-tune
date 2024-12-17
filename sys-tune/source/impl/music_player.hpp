@@ -8,11 +8,18 @@ namespace tune::impl {
     using PlaylistID = u32;
 
     struct PlaylistEntry {
-        std::string path;
-        PlaylistID id;
+        PlaylistID id{UINT32_MAX};
+
+        bool IsValid() const {
+            return id != UINT32_MAX;
+        }
+
+        void Reset() {
+            id = UINT32_MAX;
+        }
     };
 
-    Result Initialize(std::vector<PlaylistEntry>* playlist, std::vector<PlaylistID>* shuffle, PlaylistEntry* current);
+    Result Initialize();
     void Exit();
 
     void TuneThreadFunc(void *);

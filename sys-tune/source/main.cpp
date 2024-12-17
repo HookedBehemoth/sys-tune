@@ -10,18 +10,10 @@ extern "C" {
 u32 __nx_applet_type     = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
 
-// do not decrease this, will either cause fatal or will fail to start
-// - 1024 * 216: needed for sys-tune to boot
-// - 1024 * 236: base
-// - 1024 * 268: needed for mp3 playback (at 32kb)
-// - 1024 * 300: needed for mp3 playback (at 64kb)
-// - 1024 * 332: needed for mp3 playback (at 96kb)
-// - 1024 * 364: needed for closing / reopening audrv and audren (mp3 at 0kb)
-// - 1024 * 460: needed for closing / reopening audrv and audren (mp3 at 96kb)
-#define INNER_HEAP_SIZE 1024 * (364 + MP3_CHUNK_SIZE_KB)
-
+// TODO(TJ): calculate minimum heap
+// TODO(TJ): calculate reasonable amount of heap for playlist entries.
 void __libnx_initheap(void) {
-    static char inner_heap[INNER_HEAP_SIZE];
+    static char inner_heap[1024 * 200]; // 256 works but will run out with big playlists.
     extern char *fake_heap_start;
     extern char *fake_heap_end;
 
@@ -46,7 +38,6 @@ void __appInit() {
     R_ABORT_UNLESS(audWrapperInitialize());
     R_ABORT_UNLESS(pm::Initialize());
     R_ABORT_UNLESS(sdmc::Open());
-    smExit();
 }
 
 void __appExit(void) {
@@ -56,6 +47,7 @@ void __appExit(void) {
     fsExit();
     pscmExit();
     gpioExit();
+    smExit();
 }
 
 } // extern "C"
@@ -70,13 +62,10 @@ namespace {
 }
 
 int main(int argc, char *argv[]) {
-    std::vector<tune::impl::PlaylistEntry> playlist;
-    std::vector<tune::impl::PlaylistID> shuffle;
-    tune::impl::PlaylistEntry current;
-    R_ABORT_UNLESS(tune::impl::Initialize(&playlist, &shuffle, &current));
+    R_ABORT_UNLESS(tune::impl::Initialize());
 
     /* Register audio as our dependency so we can pause before it prepares for sleep. */
-    constexpr const u32 dependencies[] = { PscPmModuleId_Audio };
+    constexpr const u32 dependencies[] = { PscPmModuleId_Fs, PscPmModuleId_Audio };
 
     /* Get pm module to listen for state change. */
     PscPmModule pm_module;

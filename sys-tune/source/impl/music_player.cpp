@@ -7,6 +7,7 @@
 #include "aud_wrapper.h"
 #include "config/config.hpp"
 #include "source.hpp"
+#include "resamplers/SDL_audioEX.h"
 
 #include <cstring>
 #include <nxExt.h>
@@ -14,18 +15,80 @@
 namespace tune::impl {
 
     namespace {
-        enum class AudrenCloseState {
-            None, // no change
-            Open, // just opened audren
-            Close, // just closed audren
+        constexpr float VOLUME_MAX = 1.f;
+        constexpr auto PLAYLIST_ENTRY_MAX = 256; // 64k
+
+        struct PlayListEntry2 {
+        public:
+            // in most cases, the path will not exceed 256 bytes,
+            // so this is a reasonable max rather than 0x301.
+            bool Add(const char* path) {
+                if (!IsEmpty()) {
+                    return false;
+                }
+
+                if (std::strlen(path) > sizeof(m_path)) {
+                    return false;
+                }
+
+                std::strcpy(m_path, path);
+                return true;
+            }
+
+            void Remove() {
+                m_path[0] = '\0';
+            }
+
+            bool IsEmpty() const {
+                return m_path[0] == '\0';
+            }
+
+        // private:
+            char m_path[256]{};
         };
 
-        constexpr float VOLUME_MAX = 1.f;
+        struct PlayList {
+            std::array<PlayListEntry2, PLAYLIST_ENTRY_MAX> m_entries{};
 
-        std::vector<PlaylistEntry>* g_playlist;
-        std::vector<PlaylistID>* g_shuffle_playlist;
-        PlaylistEntry* g_current;
+            bool Add(u32 index, const char* path) {
+                if (index > m_entries.size()) {
+                    return false;
+                }
+
+                return m_entries[index].Add(path);
+            }
+
+            void Remove(u32 index) {
+                if (index > m_entries.size()) {
+                    return;
+                }
+
+                return m_entries[index].Remove();
+            }
+
+            s32 FindNextFreeEntry() const {
+                for (u32 i = 0; i < m_entries.size(); i++) {
+                    if (m_entries[i].IsEmpty()) {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+
+            const char* GetPath(u32 index) {
+                return m_entries[index].m_path;
+            }
+        };
+
+        PlayList g_playlist2;
+
+        // todo: move below into playlist struct
+        std::vector<PlaylistEntry> g_playlist;
+        std::vector<PlaylistID> g_shuffle_playlist;
+        PlaylistEntry g_current;
         u32 g_queue_position;
+
         LockableMutex g_mutex;
 
         RepeatMode g_repeat   = RepeatMode::All;
@@ -33,267 +96,133 @@ namespace tune::impl {
         PlayerStatus g_status = PlayerStatus::FetchNext;
         Source *g_source = nullptr;
 
-        float g_tune_volume = 1.f;
         float g_title_volume = 1.f;
         float g_default_title_volume = 1.f;
         bool g_use_title_volume = true;
 
-        AudioDriver g_drv;
-        constexpr const int MinSampleCount  = 256;
-        constexpr const int MaxChannelCount = 8;
-        constexpr const int BufferCount     = 2;
-        constexpr const int AudioSampleSize = MinSampleCount * MaxChannelCount * sizeof(s16);
-        constexpr const int AudioPoolSize   = AudioSampleSize * BufferCount;
-        alignas(AUDREN_MEMPOOL_ALIGNMENT) u8 AudioMemoryPool[AudioPoolSize];
+        constexpr auto AUDIO_BUFFER_COUNT = 2;
+        constexpr auto AUDIO_BUFFER_SIZE = 0x1000;
 
-        static_assert((sizeof(AudioMemoryPool) % 0x2000) == 0, "Audio Memory pool needs to be page aligned!");
+        alignas(0x1000) s16 AudioMemoryPool[AUDIO_BUFFER_COUNT][AUDIO_BUFFER_SIZE];
+        static_assert((sizeof(AudioMemoryPool[0]) % 0x2000) == 0, "Audio Memory pool needs to be page aligned!");
 
-        bool g_should_pause = false;
-        bool g_should_run   = true;
-        bool g_close_audren = false;
+        bool g_awoken_from_sleep = false;
+        bool g_should_pause      = false;
+        bool g_should_run        = true;
+        bool g_audout_init       = false;
+
+        void audioExit() {
+            if (g_audout_init) {
+                audoutStopAudioOut();
+                audoutExit();
+                g_audout_init = false;
+            }
+        }
 
         Result audioInit() {
-            /* Default audio config. */
-            const AudioRendererConfig audren_cfg = {
-                .output_rate = AudioRendererOutputRate_48kHz,
-                .num_voices = 2,
-                .num_effects = 0,
-                .num_sinks = 1,
-                .num_mix_objs = 1,
-                .num_mix_buffers = 2,
-            };
+            if (g_audout_init) {
+                audioExit();
+            }
 
-            smInitialize();
-            Result rc = audrenInitialize(&audren_cfg);
-            smExit();
+            Result rc;
 
-            if (R_SUCCEEDED(rc)) {
-                /* Create audio driver. */
-                rc = audrvCreate(&g_drv, &audren_cfg, 2);
-                if (R_SUCCEEDED(rc)) {
-                    /* Register memory pool. */
-                    int mpid = audrvMemPoolAdd(&g_drv, AudioMemoryPool, AudioPoolSize);
-                    audrvMemPoolAttach(&g_drv, mpid);
-
-                    /* Attach default sink. */
-                    u8 sink_channels[] = {0, 1};
-                    audrvDeviceSinkAdd(&g_drv, AUDREN_DEFAULT_DEVICE_NAME, 2, sink_channels);
-
-                    rc = audrvUpdate(&g_drv);
-                    if (R_SUCCEEDED(rc)) {
-                        return audrenStartAudioRenderer();
-                    } else {
-                        /* Cleanup on failure */
-                        audrvClose(&g_drv);
-                    }
-                } else {
-                    /* Cleanup on failure */
-                    audrenExit();
+            if (R_SUCCEEDED(rc = audoutInitialize())) {
+                if (R_SUCCEEDED(rc = audoutStartAudioOut())) {
+                    SetVolume(config::get_volume());
+                    g_audout_init = true;
+                    return 0;
                 }
+                audoutExit();
             }
 
             return rc;
         }
 
-        // Only call this from audrv thread, as closing audrv
-        // while accesing it will be very bad.
-        AudrenCloseState PollAudrenCloseState() {
-            static bool close_audren_previous = false;
+        Result PlayTrack(const char* path) {
+            R_TRY(audioInit());
 
-            if (close_audren_previous != g_close_audren) {
-                close_audren_previous = g_close_audren;
-                if (g_close_audren) {
-                    audrvClose(&g_drv);
-                    audrenExit();
-                    return AudrenCloseState::Close;
-                } else {
-                    audioInit();
-                    SetVolume(g_tune_volume);
-                    return AudrenCloseState::Open;
-                }
-            }
-
-            return AudrenCloseState::None;
-        }
-
-        Result PlayTrack(const std::string &path) {
             /* Open file and allocate */
-            auto source = OpenFile(path.c_str());
+            auto source = OpenFile(path);
             R_UNLESS(source != nullptr, tune::FileOpenFailure);
             R_UNLESS(source->IsOpen(), tune::FileOpenFailure);
-
-            const auto channel_count = source->GetChannelCount();
-            const auto sample_rate   = source->GetSampleRate();
-
-            const auto voice_init = [&]() -> Result {
-                R_UNLESS(audrvVoiceInit(&g_drv, 0, channel_count, PcmFormat_Int16, sample_rate), tune::VoiceInitFailure);
-
-                audrvVoiceSetDestinationMix(&g_drv, 0, AUDREN_FINAL_MIX_ID);
-
-                if (channel_count == 1) {
-                    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 0);
-                    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 1);
-                } else {
-                    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 0, 0);
-                    audrvVoiceSetMixFactor(&g_drv, 0, 0.0f, 0, 1);
-                    audrvVoiceSetMixFactor(&g_drv, 0, 0.0f, 1, 0);
-                    audrvVoiceSetMixFactor(&g_drv, 0, 1.0f, 1, 1);
-                }
-
-                audrvVoiceStart(&g_drv, 0);
-
-                return 0;
-            };
-
-            if (auto rc = voice_init(); R_FAILED(rc)) {
-                return rc;
-            }
-
-            const s32 sample_count                  = AudioSampleSize / channel_count / sizeof(s16);
-            AudioDriverWaveBuf buffers[BufferCount] = {};
-
-            for (int i = 0; i < BufferCount; i++) {
-                buffers[i].data_pcm16          = reinterpret_cast<s16 *>(&AudioMemoryPool);
-                buffers[i].size                = AudioSampleSize;
-                buffers[i].start_sample_offset = i * sample_count;
-                buffers[i].end_sample_offset   = buffers[i].start_sample_offset + sample_count;
-            }
+            R_UNLESS(source->SetupResampler(audoutGetChannelCount(), audoutGetSampleRate()), tune::VoiceInitFailure);
 
             g_source = source.get();
 
-            while (g_should_run && g_status == PlayerStatus::Playing) {
-                switch (PollAudrenCloseState()) {
-                    case AudrenCloseState::None:
-                        break;
-                    case AudrenCloseState::Open:
-                        if (auto rc = voice_init(); R_FAILED(rc)) {
-                            g_source = nullptr;
-                            return rc;
-                        }
-                        break;
-                    case AudrenCloseState::Close:
-                        for (auto &buffer : buffers) {
-                            buffer.state = AudioDriverWaveBufState_Free;
-                        }
-                        break;
-                }
+            AudioOutBuffer audout_buffer[AUDIO_BUFFER_COUNT]{};
+            for (int i = 0; i < AUDIO_BUFFER_COUNT; i++) {
+                audout_buffer[i].next = NULL;
+                audout_buffer[i].buffer = AudioMemoryPool[i];
+                audout_buffer[i].buffer_size = sizeof(AudioMemoryPool[i]);
+            }
 
-                if (g_close_audren) {
-                    svcSleepThread(100'000'000ul);
-                    continue;
+            bool pause_state_changed = g_should_pause;
+
+            while (g_should_run && g_status == PlayerStatus::Playing) {
+                if (g_awoken_from_sleep) {
+                    g_awoken_from_sleep = false;
+                    R_TRY(audioInit());
                 }
 
                 if (g_should_pause) {
+                    pause_state_changed = g_should_pause;
                     svcSleepThread(17'000'000);
                     continue;
                 }
 
-                AudioDriverWaveBuf *refillBuf = nullptr;
-                for (auto &buffer : buffers) {
-                    if (buffer.state == AudioDriverWaveBufState_Free || buffer.state == AudioDriverWaveBufState_Done) {
-                        refillBuf = &buffer;
+                // fixes bad sound.
+                if (pause_state_changed != g_should_pause) {
+                    pause_state_changed = g_should_pause;
+                    R_TRY(audioInit());
+                }
+
+                AudioOutBuffer* buffer = NULL;
+                for (int i = 0; i < AUDIO_BUFFER_COUNT; i++) {
+                    bool has_buffer = false;
+                    R_TRY(audoutContainsAudioOutBuffer(&audout_buffer[i], &has_buffer));
+                    if (!has_buffer) {
+                        buffer = &audout_buffer[i];
                         break;
                     }
                 }
 
-                if (refillBuf) {
-                    s16 *data = reinterpret_cast<s16 *>(&AudioMemoryPool) + refillBuf->start_sample_offset * 2;
+                if (!buffer) {
+                    u32 released_count;
+                    R_TRY(audoutWaitPlayFinish(&buffer, &released_count, UINT64_MAX));
+                }
 
-                    int nSamples = source->Decode(sample_count, data);
-
-                    if (nSamples == 0 && source->Done()) {
-                        if (g_repeat != RepeatMode::One)
+                if (buffer) {
+                    const auto nSamples = source->Resample((u8*)buffer->buffer, buffer->buffer_size);
+                    if (nSamples <= 0) {
+                        if (g_repeat != RepeatMode::One) {
                             Next();
+                        }
                         break;
+                    } else {
+                        buffer->data_size = nSamples;
+                        R_TRY(audoutAppendAudioOutBuffer(buffer));
                     }
-
-                    armDCacheFlush(data, nSamples * 2 * sizeof(u16));
-                    refillBuf->end_sample_offset = refillBuf->start_sample_offset + nSamples;
-
-                    audrvVoiceAddWaveBuf(&g_drv, 0, refillBuf);
-                    audrvVoiceStart(&g_drv, 0);
                 }
-
-                audrvUpdate(&g_drv);
-                audrenWaitFrame();
             }
 
-            audrvVoiceDrop(&g_drv, 0);
             g_source = nullptr;
+
+            // re-open and then pause, otherwise artifacts will continue to play...
+            audioInit();
+            audoutStopAudioOut();
 
             return 0;
         }
 
     }
 
-    Result Initialize(std::vector<PlaylistEntry>* playlist, std::vector<PlaylistID>* shuffle, PlaylistEntry* current) {
-        g_playlist = playlist;
-        g_shuffle_playlist = shuffle;
-        g_current = current;
-
-        // tldr, most fancy things made by N will fatal
-        const u64 blacklist[] = {
-            // https://github.com/HookedBehemoth/sys-tune/issues/10
-            0x010077B00E046000, // spyro reignited trilogy
-            0x0100AD9012510000, // pac man 99
-            0x01006C100EC08000, // minecraft dugeons
-            0x01000A10041EA000, // skyrim
-            0x0100F9F00C696000, // crash team racing nitro fueled
-            0x01001E9003502000, // labo 03
-            0x0100165003504000, // labo 04
-            0x0100F2300D4BA000, // darksiders genesis
-            0x0100E1400BA96000, // darksiders warmastered edition
-            0x010071800BA98000, // darksiders 2
-            0x0100F8F014190000, // darksiders 3
-            0x0100D870045B6000, // NES NSO
-            0x01008D300C50C000, // SNES NSO
-            0x0100C62011050000, // GB NSO
-            0x010012F017576000, // GBA NSO
-            0x0100C9A00ECE6000, // N64 NSO
-
-            // https://github.com/tallbl0nde/TriPlayer/issues/31
-            0x0100E5600D446000, // Ni No Kuni: Wrath of the White Witch
-            0x0100A3900C3E2000, // Paper Mario™: The Origami King
-            0x0100626011656000, // The Outer Worlds
-            0x010090F012916000, // Ghostrunner
-            0x0100F15012D36000, // IMMERSE LAND
-            0x01005950022EC000, // Blade Strangers
-            0x0100423009358000, // Death Road to Canada
-            0x010044500C182000, // Sid Meier's Civilization VI
-
-            // anything made by PROTOTYPE
-            0x0100A3A00CC7E000, // CLANNAD
-            0x01007B501372C000, // CLANNAD Side Stories
-            0x01003B300E4AA000, // THE GRISAIA TRILOGY
-            0x0100F06013710000, // ISLAND
-            0x0100BD100C752000, // planetarian
-            0x01002330123BC000, // GRISAIA PHANTOM TRIGGER 05
-            0x0100240013AE8000, // GRISAIA PHANTOM TRIGGER 06
-            0x01002EF014DA2000, // GRISAIA PHANTOM TRIGGER 07
-            0x0100398010314000, // Tomoyo After -It's a Wonderful Life- CS Edition
-            0x01004AB0133E8000, // GRISAIA PHANTOM TRIGGER 01 to 05
-            0x01005250123B8000, // GRISAIA PHANTOM TRIGGER 03
-            0x010054101370E000, // FATAL TWELVE
-            0x010062A0178A8000, // LOOPERS
-            0x0100806017562000, // OshiRabu: Waifus Over Husbandos + Love･or･die
-            0x0100943010310000, // Little Busters! Converted Edition
-            0x010096000CA38000, // TAISHO x ALICE ALL IN ONE
-            0x0100A1200CA3C000, // Butterfly's Poison; Blood Chains
-            0x0100C38019CE4000, // GRISAIA PHANTOM TRIGGER 08
-            0x0100C9C0178A6000, // Harmonia
-            0x0100CAF013AE6000, // GRISAIA PHANTOM TRIGGER 5.5
-            0x0100D970123BA000, // GRISAIA PHANTOM TRIGGER 04
-        };
-
-        // do this on startup because the user may not copy a config
-        // file or delete it at somepoint
-        for (auto tid : blacklist) {
-            config::set_title_blacklist(tid, true);
-        }
-
+    Result Initialize() {
         if (auto rc = audioInit(); R_FAILED(rc)) {
             return rc;
         }
+
+        g_playlist.reserve(PLAYLIST_ENTRY_MAX);
+        g_shuffle_playlist.reserve(PLAYLIST_ENTRY_MAX);
 
         /* Fetch values from config, sanitize the return value */
         if (auto c = config::get_repeat(); c <= 2 && c >= 0) {
@@ -301,7 +230,6 @@ namespace tune::impl {
         }
 
         SetShuffleMode(static_cast<ShuffleMode>(config::get_shuffle()));
-        SetVolume(config::get_volume());
         SetDefaultTitleVolume(config::get_default_title_volume());
 
         return 0;
@@ -315,49 +243,41 @@ namespace tune::impl {
     void TuneThreadFunc(void *) {
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_should_run) {
-            // update g_close_audren, returned state isn't needed
-            PollAudrenCloseState();
-
-            if (g_close_audren) {
-                svcSleepThread(100'000'000ul);
-                continue;
-            }
-
-            g_current->path = "";
+            g_current.Reset();
             {
                 std::scoped_lock lk(g_mutex);
 
-                const auto &queue = *g_playlist;
+                const auto &queue = g_playlist;
                 const auto queue_size = queue.size();
                 if (queue_size == 0) {
-                    g_current->path = "";
+                    g_current.Reset();
                 } else if (g_queue_position >= queue_size) {
                     g_queue_position = queue_size - 1;
                     continue;
                 } else {
                     if (g_shuffle == ShuffleMode::On) {
-                        const auto shuffle_id = (*g_shuffle_playlist)[g_queue_position];
-                        for (u32 i = 0; i < g_playlist->size(); i++) {
-                            if ((*g_playlist)[i].id == shuffle_id) {
-                                *g_current = (*g_playlist)[i];
+                        const auto shuffle_id = g_shuffle_playlist[g_queue_position];
+                        for (u32 i = 0; i < g_playlist.size(); i++) {
+                            if (g_playlist[i].id == shuffle_id) {
+                                g_current = g_playlist[i];
                                 break;
                             }
                         }
                     } else {
-                        *g_current = queue[g_queue_position];
+                        g_current = queue[g_queue_position];
                     }
                 }
             }
 
             /* Sleep if queue is empty. */
-            if (g_current->path.empty()) {
+            if (!g_current.IsValid()) {
                 svcSleepThread(100'000'000ul);
                 continue;
             }
 
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
-            Result rc = PlayTrack(g_current->path);
+            Result rc = PlayTrack(g_playlist2.GetPath(g_current.id));
 
             /* Log error. */
             if (R_FAILED(rc)) {
@@ -371,12 +291,7 @@ namespace tune::impl {
             }
         }
 
-        if (!g_close_audren) {
-            audrvClose(&g_drv);
-            // this needs to be closed asap if a blacklisted title is launched.
-            // this is why we close this here rather than in __appExit
-            audrenExit();
-        }
+        audioExit();
     }
 
     void PscmThreadFunc(void *ptr) {
@@ -398,6 +313,7 @@ namespace tune::impl {
                 // PscPmState_ReadySleep is sent multiple times.
                 // todo: fade in and delay playback on wakeup slightly
                 case PscPmState_ReadyAwaken:
+                    g_awoken_from_sleep = true;
                     g_should_pause = previous_state;
                     break;
                 // pause on sleep
@@ -420,6 +336,7 @@ namespace tune::impl {
         /* [0] Low == plugged in; [1] High == not plugged in. */
         GpioValue old_value = GpioValue_High;
 
+        // TODO(TJ): pausing on headphone change should be a config option.
         while (g_should_run) {
             /* Fetch current gpio value. */
             GpioValue value;
@@ -441,9 +358,6 @@ namespace tune::impl {
         while (g_should_run) {
             u64 pid{}, new_tid{};
             if (pm::PollCurrentPidTid(&pid, &new_tid)) {
-                // check if title is blacklisted
-                g_close_audren = config::get_title_blacklist(new_tid);
-
                 g_title_volume = 1.f;
 
                 if (config::has_title_volume(new_tid)) {
@@ -451,7 +365,7 @@ namespace tune::impl {
                     SetTitleVolume(std::clamp(config::get_title_volume(new_tid), 0.f, VOLUME_MAX));
                 }
 
-                // TODO: fade song in rather than abruptly playing to avoid jump scares
+                // TODO(TJ): fade song in rather than abruptly playing to avoid jump scares
                 if (config::has_title_enabled(new_tid)) {
                     g_should_pause = !config::get_title_enabled(new_tid);
                 } else {
@@ -490,7 +404,7 @@ namespace tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            if (g_queue_position < g_playlist->size() - 1) {
+            if (g_queue_position < g_playlist.size() - 1) {
                 g_queue_position++;
             } else {
                 g_queue_position = 0;
@@ -509,7 +423,7 @@ namespace tune::impl {
             if (g_queue_position > 0) {
                 g_queue_position--;
             } else {
-                g_queue_position = g_playlist->size() - 1;
+                g_queue_position = g_playlist.size() - 1;
             }
         }
         g_status     = PlayerStatus::FetchNext;
@@ -517,12 +431,14 @@ namespace tune::impl {
     }
 
     float GetVolume() {
-        return g_drv.in_mixes[0].volume;
+        float volume = 1.F;
+        audoutGetAudioOutVolume(&volume);
+        return volume;
     }
 
     void SetVolume(float volume) {
         volume = std::clamp(volume, 0.f, VOLUME_MAX);
-        g_tune_volume = g_drv.in_mixes[0].volume = volume;
+        audoutSetAudioOutVolume(volume);
         config::set_volume(volume);
     }
 
@@ -561,30 +477,22 @@ namespace tune::impl {
     void SetShuffleMode(ShuffleMode mode) {
         std::scoped_lock lk(g_mutex);
 
-        // if (g_playlist->size() > 0 && g_shuffle != mode) {
-        //     auto &dst = (mode == ShuffleMode::On) ? *g_shuffle_playlist : *g_playlist;
-
-        //     auto it = std::find(dst.cbegin(), dst.cend(), *g_current);
-        //     if (it != dst.cend())
-        //         g_queue_position = std::distance(dst.cbegin(), it);
-        // }
-
         g_shuffle = mode;
     }
 
     u32 GetPlaylistSize() {
         std::scoped_lock lk(g_mutex);
 
-        return g_playlist->size();
+        return g_playlist.size();
     }
 
     Result GetPlaylistItem(u32 index, char *buffer, size_t buffer_size) {
         std::scoped_lock lk(g_mutex);
 
-        if (index >= g_playlist->size())
+        if (index >= g_playlist.size())
             return tune::OutOfRange;
 
-        std::strncpy(buffer, (*g_playlist)[index].path.c_str(), buffer_size);
+        std::strncpy(buffer, g_playlist2.GetPath(index), buffer_size);
 
         return 0;
     }
@@ -595,9 +503,9 @@ namespace tune::impl {
 
         {
             std::scoped_lock lk(g_mutex);
-            R_UNLESS(!g_current->path.empty(), tune::NotPlaying);
-            R_UNLESS(buffer_size >= g_current->path.size(), tune::InvalidArgument);
-            std::strcpy(buffer, g_current->path.c_str());
+            R_UNLESS(g_current.IsValid(), tune::NotPlaying);
+            // R_UNLESS(buffer_size >= g_current.path.size(), tune::InvalidArgument);
+            std::strcpy(buffer, g_playlist2.GetPath(g_current.id));
         }
 
         auto [current, total] = g_source->Tell();
@@ -614,8 +522,8 @@ namespace tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            g_playlist->clear();
-            g_shuffle_playlist->clear();
+            g_playlist.clear();
+            g_shuffle_playlist.clear();
         }
         g_status = PlayerStatus::FetchNext;
     }
@@ -623,7 +531,7 @@ namespace tune::impl {
     void MoveQueueItem(u32 src, u32 dst) {
         std::scoped_lock lk(g_mutex);
 
-        const auto queue_size = g_playlist->size();
+        const auto queue_size = g_playlist.size();
 
         if (src >= queue_size) {
             src = queue_size - 1;
@@ -632,11 +540,11 @@ namespace tune::impl {
             dst = queue_size - 1;
         }
 
-        auto source = g_playlist->cbegin() + src;
-        auto dest   = g_playlist->cbegin() + dst;
+        auto source = g_playlist.cbegin() + src;
+        auto dest   = g_playlist.cbegin() + dst;
 
-        g_playlist->insert(dest, *source);
-        g_playlist->erase(source);
+        g_playlist.insert(dest, *source);
+        g_playlist.erase(source);
 
         if (src < dst) {
             if (g_queue_position == src) {
@@ -658,7 +566,7 @@ namespace tune::impl {
             std::scoped_lock lk(g_mutex);
 
             /* Check if we are out of bounds. */
-            size_t queue_size = g_playlist->size();
+            size_t queue_size = g_playlist.size();
             if (index >= queue_size) {
                 index = queue_size - 1;
             }
@@ -667,9 +575,9 @@ namespace tune::impl {
             u32 pos = index;
 
             if (g_shuffle == ShuffleMode::On) {
-                const auto track = g_playlist->cbegin() + index;
-                for (u32 i = 0; i < g_shuffle_playlist->size(); i++) {
-                    if ((*g_shuffle_playlist)[i] == track->id) {
+                const auto track = g_playlist.cbegin() + index;
+                for (u32 i = 0; i < g_shuffle_playlist.size(); i++) {
+                    if (g_shuffle_playlist[i] == track->id) {
                         pos = i;
                         break;
                     }
@@ -692,37 +600,39 @@ namespace tune::impl {
     }
 
     Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
-        // NOTE: do not decrement this
-        static PlaylistID playlist_id{};
-
         /* Ensure file exists. */
         if (!sdmc::FileExists(buffer))
             return tune::InvalidPath;
 
         std::scoped_lock lk(g_mutex);
 
+        const auto new_id = g_playlist2.FindNextFreeEntry();
+        if (new_id < 0) {
+            return tune::OutOfMemory;
+        }
+
+        if (!g_playlist2.Add(new_id, buffer)) {
+            return tune::OutOfMemory;
+        }
+
         const PlaylistEntry new_entry{
-            .path = {buffer, buffer_length},
-            .id = playlist_id
+            .id = static_cast<PlaylistID>(new_id)
         };
 
         // add new entry to playlist
         if (type == EnqueueType::Front) {
-            g_playlist->emplace(g_playlist->cbegin(), new_entry);
+            g_playlist.emplace(g_playlist.cbegin(), new_entry);
             if (g_shuffle == ShuffleMode::Off) {
                 g_queue_position++;
             }
         } else {
-            g_playlist->emplace_back(new_entry);
+            g_playlist.emplace_back(new_entry);
         }
 
         // add new entry id to shuffle_playlist_list
-        const auto shuffle_playlist_size = g_shuffle_playlist->size();
+        const auto shuffle_playlist_size = g_shuffle_playlist.size();
         const auto shuffle_index = (shuffle_playlist_size > 1) ? (randomGet64() % shuffle_playlist_size) : 0;
-        g_shuffle_playlist->emplace(g_shuffle_playlist->cbegin() + shuffle_index, playlist_id);
-
-        // increase playlist counter
-        playlist_id++;
+        g_shuffle_playlist.emplace(g_shuffle_playlist.cbegin() + shuffle_index, new_id);
 
         return 0;
     }
@@ -731,27 +641,28 @@ namespace tune::impl {
         std::scoped_lock lk(g_mutex);
 
         /* Ensure we don't operate out of bounds. */
-        R_UNLESS(!g_playlist->empty(), tune::QueueEmpty);
-        R_UNLESS(index < g_playlist->size(), tune::OutOfRange);
+        R_UNLESS(!g_playlist.empty(), tune::QueueEmpty);
+        R_UNLESS(index < g_playlist.size(), tune::OutOfRange);
 
         /* Get iterator for index position. */
-        const auto track = g_playlist->cbegin() + index;
+        const auto track = g_playlist.cbegin() + index;
+        g_playlist2.Remove(track->id);
 
-        for (u32 i = 0; i < g_shuffle_playlist->size(); i++) {
-            if ((*g_shuffle_playlist)[i] == track->id) {
-                const auto shuffle_it = g_shuffle_playlist->cbegin() + i;
+        for (u32 i = 0; i < g_shuffle_playlist.size(); i++) {
+            if (g_shuffle_playlist[i] == track->id) {
+                const auto shuffle_it = g_shuffle_playlist.cbegin() + i;
                 // we are playing from shuffle list so use that index instead
                 if (g_shuffle == ShuffleMode::On) {
                     index = i;
                 }
                 // finally remove
-                g_shuffle_playlist->erase(shuffle_it);
+                g_shuffle_playlist.erase(shuffle_it);
                 break;
             }
         }
 
         /* Remove entry. */
-        g_playlist->erase(track);
+        g_playlist.erase(track);
 
         /* Fetch a new track if we deleted the current song. */
         bool fetch_new = g_queue_position == index;
