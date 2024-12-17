@@ -16,7 +16,7 @@ namespace tune::impl {
 
     namespace {
         constexpr float VOLUME_MAX = 1.f;
-        constexpr auto PLAYLIST_ENTRY_MAX = 256; // 64k
+        constexpr auto PLAYLIST_ENTRY_MAX = 512; // 128k
 
         struct PlayListEntry2 {
         public:
@@ -78,6 +78,12 @@ namespace tune::impl {
 
             const char* GetPath(u32 index) {
                 return m_entries[index].m_path;
+            }
+
+            void Clear() {
+                for (u32 i = 0; i < m_entries.size(); i++) {
+                    m_entries[i].Remove();
+                }
             }
         };
 
@@ -524,6 +530,7 @@ namespace tune::impl {
 
             g_playlist.clear();
             g_shuffle_playlist.clear();
+            g_playlist2.Clear();
         }
         g_status = PlayerStatus::FetchNext;
     }
