@@ -12,7 +12,6 @@
 
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
-#define DRMP3_DATA_CHUNK_SIZE (1024 * MP3_CHUNK_SIZE_KB)
 #include "dr_mp3.h"
 
 #define DR_WAV_IMPLEMENTATION
@@ -96,6 +95,41 @@ Source::~Source() {
     this->m_size   = 0;
 }
 
+bool Source::SetupResampler(u32 output_channels, u32 output_sample_rate) {
+    m_sdl_stream = UniqueAudioStream{
+        SDL_NewAudioStreamEX(
+        AUDIO_S16, GetChannelCount(), GetSampleRate(),
+        AUDIO_S16, output_channels, output_sample_rate)
+    };
+
+    return m_sdl_stream != nullptr;
+}
+
+s64 Source::Resample(u8* out, std::size_t size) {
+    if (!out || !size) {
+        return -1;
+    }
+
+    s64 data_read = 0;
+    while (size > 0) {
+        if (auto sz = SDL_AudioStreamGetEX(m_sdl_stream.get(), out, size); sz != 0) {
+            size -= sz;
+            out += sz;
+            data_read += sz;
+        } else {
+            const auto dec_got = Decode(m_resample_buffer.size(), m_resample_buffer.data());
+            if (dec_got == 0) {
+                return data_read;
+            }
+            if (0 != SDL_AudioStreamPutEX(m_sdl_stream.get(), m_resample_buffer.data(), dec_got)) {
+                return -1;
+            }
+        }
+    }
+
+    return data_read;
+}
+
 size_t Source::Read(void *buffer, size_t read_size) {
     size_t bytes_read = 0;
     if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read))) {
@@ -145,7 +179,7 @@ class FlacFile final : public Source {
     size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
-        return drflac_read_pcm_frames_s16(this->m_flac, sample_count, data);
+        return GetChannelCount() * sizeof(s16) * drflac_read_pcm_frames_s16(this->m_flac, sample_count / GetChannelCount(), data);
     }
 
     std::pair<u32, u32> Tell() override {
@@ -194,7 +228,7 @@ class Mp3File final : public Source {
     size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
-        return drmp3_read_pcm_frames_s16(&this->m_mp3, sample_count, data);
+        return GetChannelCount() * sizeof(s16) * drmp3_read_pcm_frames_s16(&this->m_mp3, sample_count / GetChannelCount(), data);
     }
 
     std::pair<u32, u32> Tell() override {
@@ -243,7 +277,7 @@ class WavFile final : public Source {
     size_t Decode(size_t sample_count, s16 *data) override {
         std::scoped_lock lk(this->m_mutex);
 
-        return drwav_read_pcm_frames_s16(&this->m_wav, sample_count, data);
+        return GetChannelCount() * sizeof(s16) * drwav_read_pcm_frames_s16(&this->m_wav, sample_count / GetChannelCount(), data);
     }
 
     std::pair<u32, u32> Tell() override {

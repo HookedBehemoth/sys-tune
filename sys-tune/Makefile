@@ -39,7 +39,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/impl ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud
+SOURCES		:=	source source/impl ../common/minIni ../common/sdmc ../common/config ../common/pm ../common/aud source/impl/resamplers
 DATA		:=	data
 INCLUDES	:=	../ipc ../common
 
@@ -62,7 +62,7 @@ endif
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
+CFLAGS	:=	-flto -g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
 CFLAGS	+=	$(INCLUDE) -DTUNE_API_VERSION=$(API_VERSION) \

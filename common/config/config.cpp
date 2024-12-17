@@ -8,12 +8,6 @@ namespace config {
 namespace {
 
 const char CONFIG_PATH[]{"/config/sys-tune/config.ini"};
-// blacklist uses it's own config file because eventually a database
-// may be setup and users can easily update their blacklist by downloading
-// an updated blacklist.ini.
-// Also, the blacklist lookup needs to be as fast as possible
-// (literally a race until the title opens audren), so a seperate, smaller file is ideal.
-const char BLACKLIST_PATH[]{"/config/sys-tune/blacklist.ini"};
 
 void create_config_dir() {
     /* Creating directory on every set call looks sus, but the user may delete the dir */
@@ -100,15 +94,6 @@ auto get_default_title_volume() -> float {
 void set_default_title_volume(float value) {
     create_config_dir();
     ini_putf("config", "global_volume", value, CONFIG_PATH);
-}
-
-auto get_title_blacklist(u64 tid) -> bool {
-    return ini_getbool("blacklist", get_tid_str(tid), false, BLACKLIST_PATH);
-}
-
-void set_title_blacklist(u64 tid, bool value) {
-    create_config_dir();
-    ini_putl("blacklist", get_tid_str(tid), value, BLACKLIST_PATH);
 }
 
 }
