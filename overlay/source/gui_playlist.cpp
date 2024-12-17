@@ -65,6 +65,8 @@ PlaylistGui::PlaylistGui() {
         return;
     }
 
+    m_list->addItem(new tsl::elm::CategoryHeader("\uE0E2  To remove all", true));
+
     char path[FS_MAX_PATH];
     for (u32 i = 0; i < count; i++) {
         rc = tuneGetPlaylistItem(i, path, FS_MAX_PATH);
@@ -83,12 +85,11 @@ PlaylistGui::PlaylistGui() {
         auto item = new ButtonListItem(str, "\uE098");
         item->setClickListener([this, item](u64 keys) -> bool {
             u32 index  = this->m_list->getIndexInList(item);
-            u8 counter = 0;
             if (keys & HidNpadButton_A) {
                 tuneSelect(index);
-                counter++;
+                return true;
             }
-            if (keys & HidNpadButton_Y) {
+            else if (keys & HidNpadButton_Y) {
                 if (R_SUCCEEDED(tuneRemove(index))) {
                     this->removeFocus();
                     this->m_list->removeIndex(index);
@@ -102,10 +103,17 @@ PlaylistGui::PlaylistGui() {
                         this->m_list->setFocusedIndex(index - 1);
                     }
                 }
-
-                counter++;
+                return true;
             }
-            return counter;
+            else if (keys & HidNpadButton_X) {
+                if (R_SUCCEEDED(tuneClearQueue())) {
+                    this->removeFocus();
+                    this->m_list->clear();
+                    m_list->addItem(new tsl::elm::ListItem("Playlist empty."));
+                }
+                return true;
+            }
+            return false;
         });
         m_list->addItem(item);
     }
