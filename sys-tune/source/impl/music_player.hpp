@@ -23,7 +23,6 @@ namespace tune::impl {
     void Exit();
 
     void TuneThreadFunc(void *);
-    void PscmThreadFunc(void *ptr);
     void GpioThreadFunc(void *ptr);
     void PmdmntThreadFunc(void *ptr);
 

@@ -106,88 +106,46 @@ namespace tune::impl {
         float g_default_title_volume = 1.f;
         bool g_use_title_volume = true;
 
-        constexpr auto AUDIO_BUFFER_COUNT = 2;
-        constexpr auto AUDIO_BUFFER_SIZE = 0x1000;
+        constexpr auto AUDIO_FREQ          = 48000;
+        constexpr auto AUDIO_CHANNEL_COUNT = 2;
+        constexpr auto AUDIO_BUFFER_COUNT  = 2;
+        constexpr auto AUDIO_LATENCY_MS    = 50;
+        constexpr auto AUDIO_BUFFER_SIZE   = AUDIO_FREQ / 1000 * AUDIO_LATENCY_MS * AUDIO_CHANNEL_COUNT;
 
-        alignas(0x1000) s16 AudioMemoryPool[AUDIO_BUFFER_COUNT][AUDIO_BUFFER_SIZE];
+        AudioOutBuffer g_audout_buffer[AUDIO_BUFFER_COUNT];
+        alignas(0x1000) s16 AudioMemoryPool[AUDIO_BUFFER_COUNT][(AUDIO_BUFFER_SIZE + 0xFFF) & ~0xFFF];
         static_assert((sizeof(AudioMemoryPool[0]) % 0x2000) == 0, "Audio Memory pool needs to be page aligned!");
 
-        bool g_awoken_from_sleep = false;
         bool g_should_pause      = false;
         bool g_should_run        = true;
-        bool g_audout_init       = false;
-
-        void audioExit() {
-            if (g_audout_init) {
-                audoutStopAudioOut();
-                audoutExit();
-                g_audout_init = false;
-            }
-        }
-
-        Result audioInit() {
-            if (g_audout_init) {
-                audioExit();
-            }
-
-            Result rc;
-
-            if (R_SUCCEEDED(rc = audoutInitialize())) {
-                if (R_SUCCEEDED(rc = audoutStartAudioOut())) {
-                    SetVolume(config::get_volume());
-                    g_audout_init = true;
-                    return 0;
-                }
-                audoutExit();
-            }
-
-            return rc;
-        }
 
         Result PlayTrack(const char* path) {
-            R_TRY(audioInit());
-
             /* Open file and allocate */
             auto source = OpenFile(path);
             R_UNLESS(source != nullptr, tune::FileOpenFailure);
             R_UNLESS(source->IsOpen(), tune::FileOpenFailure);
             R_UNLESS(source->SetupResampler(audoutGetChannelCount(), audoutGetSampleRate()), tune::VoiceInitFailure);
 
-            g_source = source.get();
-
-            AudioOutBuffer audout_buffer[AUDIO_BUFFER_COUNT]{};
-            for (int i = 0; i < AUDIO_BUFFER_COUNT; i++) {
-                audout_buffer[i].next = NULL;
-                audout_buffer[i].buffer = AudioMemoryPool[i];
-                audout_buffer[i].buffer_size = sizeof(AudioMemoryPool[i]);
+            AudioOutState state;
+            R_TRY(audoutGetAudioOutState(&state));
+            if (state == AudioOutState_Stopped) {
+                R_TRY(audoutStartAudioOut());
             }
 
-            bool pause_state_changed = g_should_pause;
+            g_source = source.get();
 
             while (g_should_run && g_status == PlayerStatus::Playing) {
-                if (g_awoken_from_sleep) {
-                    g_awoken_from_sleep = false;
-                    R_TRY(audioInit());
-                }
-
                 if (g_should_pause) {
-                    pause_state_changed = g_should_pause;
                     svcSleepThread(17'000'000);
                     continue;
-                }
-
-                // fixes bad sound.
-                if (pause_state_changed != g_should_pause) {
-                    pause_state_changed = g_should_pause;
-                    R_TRY(audioInit());
                 }
 
                 AudioOutBuffer* buffer = NULL;
                 for (int i = 0; i < AUDIO_BUFFER_COUNT; i++) {
                     bool has_buffer = false;
-                    R_TRY(audoutContainsAudioOutBuffer(&audout_buffer[i], &has_buffer));
+                    R_TRY(audoutContainsAudioOutBuffer(&g_audout_buffer[i], &has_buffer));
                     if (!has_buffer) {
-                        buffer = &audout_buffer[i];
+                        buffer = &g_audout_buffer[i];
                         break;
                     }
                 }
@@ -197,25 +155,26 @@ namespace tune::impl {
                     R_TRY(audoutWaitPlayFinish(&buffer, &released_count, UINT64_MAX));
                 }
 
+                bool error = false;
                 if (buffer) {
-                    const auto nSamples = source->Resample((u8*)buffer->buffer, buffer->buffer_size);
+                    const auto nSamples = source->Resample((u8*)buffer->buffer, AUDIO_BUFFER_SIZE * sizeof(s16));
                     if (nSamples <= 0) {
-                        if (g_repeat != RepeatMode::One) {
-                            Next();
-                        }
-                        break;
+                        error = true;
                     } else {
                         buffer->data_size = nSamples;
                         R_TRY(audoutAppendAudioOutBuffer(buffer));
                     }
                 }
+
+                if (error || source->Done()) {
+                    if (g_repeat != RepeatMode::One) {
+                        Next();
+                    }
+                    break;
+                }
             }
 
             g_source = nullptr;
-
-            // re-open and then pause, otherwise artifacts will continue to play...
-            audioInit();
-            audoutStopAudioOut();
 
             return 0;
         }
@@ -223,9 +182,13 @@ namespace tune::impl {
     }
 
     Result Initialize() {
-        if (auto rc = audioInit(); R_FAILED(rc)) {
-            return rc;
+        for (int i = 0; i < AUDIO_BUFFER_COUNT; i++) {
+            g_audout_buffer[i].buffer = AudioMemoryPool[i];
+            g_audout_buffer[i].buffer_size = sizeof(AudioMemoryPool[i]);
         }
+
+        R_TRY(audoutInitialize());
+        SetVolume(config::get_volume());
 
         g_playlist.reserve(PLAYLIST_ENTRY_MAX);
         g_shuffle_playlist.reserve(PLAYLIST_ENTRY_MAX);
@@ -297,41 +260,8 @@ namespace tune::impl {
             }
         }
 
-        audioExit();
-    }
-
-    void PscmThreadFunc(void *ptr) {
-        PscPmModule *module = static_cast<PscPmModule *>(ptr);
-        bool previous_state{};
-
-        while (g_should_run) {
-            Result rc = eventWait(&module->event, 10'000'000);
-            if (R_VALUE(rc) == KERNELRESULT(TimedOut))
-                continue;
-            if (R_VALUE(rc) == KERNELRESULT(Cancelled))
-                break;
-
-            PscPmState state;
-            u32 flags;
-            R_ABORT_UNLESS(pscPmModuleGetRequest(module, &state, &flags));
-            switch (state) {
-                // NOTE: PscPmState_Awake event seems to get missed (rare) or
-                // PscPmState_ReadySleep is sent multiple times.
-                // todo: fade in and delay playback on wakeup slightly
-                case PscPmState_ReadyAwaken:
-                    g_awoken_from_sleep = true;
-                    g_should_pause = previous_state;
-                    break;
-                // pause on sleep
-                case PscPmState_ReadySleep:
-                    previous_state = g_should_pause;
-                    g_should_pause = true;
-                    break;
-                default:
-                    break;
-            }
-            pscPmModuleAcknowledge(module, state);
-        }
+        audoutStopAudioOut();
+        audoutExit();
     }
 
     void GpioThreadFunc(void *ptr) {
