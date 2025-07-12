@@ -33,7 +33,6 @@ void __appInit() {
     }
 
     R_ABORT_UNLESS(gpioInitialize());
-    R_ABORT_UNLESS(pscmInitialize());
     R_ABORT_UNLESS(fsInitialize());
     R_ABORT_UNLESS(audWrapperInitialize());
     R_ABORT_UNLESS(pm::Initialize());
@@ -45,7 +44,6 @@ void __appExit(void) {
     pm::Exit();
     audWrapperExit();
     fsExit();
-    pscmExit();
     gpioExit();
     smExit();
 }
@@ -55,7 +53,6 @@ void __appExit(void) {
 namespace {
 
     alignas(0x1000) u8 gpioThreadBuffer[0x1000];
-    alignas(0x1000) u8 pscmThreadBuffer[0x1000];
     alignas(0x1000) u8 pmdmntThreadBuffer[0x1000];
     alignas(0x1000) u8 tuneThreadBuffer[0x6000];
 
@@ -64,28 +61,18 @@ namespace {
 int main(int argc, char *argv[]) {
     R_ABORT_UNLESS(tune::impl::Initialize());
 
-    /* Register audio as our dependency so we can pause before it prepares for sleep. */
-    constexpr const u32 dependencies[] = { PscPmModuleId_Fs, PscPmModuleId_Audio };
-
-    /* Get pm module to listen for state change. */
-    PscPmModule pm_module;
-    R_ABORT_UNLESS(pscmGetPmModule(&pm_module, PscPmModuleId(420), dependencies, sizeof(dependencies) / sizeof(u32), true));
-
     /* Get GPIO session for the headphone jack pad. */
     GpioPadSession headphone_detect_session;
     R_ABORT_UNLESS(gpioOpenSession(&headphone_detect_session, GpioPadName(0x15)));
 
     ::Thread gpioThread;
-    ::Thread pscmThread;
     ::Thread pmdmtThread;
     ::Thread tuneThread;
     R_ABORT_UNLESS(threadCreate(&gpioThread, tune::impl::GpioThreadFunc, &headphone_detect_session, gpioThreadBuffer, sizeof(gpioThreadBuffer), 0x20, -2));
-    R_ABORT_UNLESS(threadCreate(&pscmThread, tune::impl::PscmThreadFunc, &pm_module, pscmThreadBuffer, sizeof(pscmThreadBuffer), 0x20, -2));
     R_ABORT_UNLESS(threadCreate(&pmdmtThread, tune::impl::PmdmntThreadFunc, nullptr, pmdmntThreadBuffer, sizeof(pmdmntThreadBuffer), 0x20, -2));
     R_ABORT_UNLESS(threadCreate(&tuneThread, tune::impl::TuneThreadFunc, nullptr, tuneThreadBuffer, sizeof(tuneThreadBuffer), 0x20, -2));
 
     R_ABORT_UNLESS(threadStart(&gpioThread));
-    R_ABORT_UNLESS(threadStart(&pscmThread));
     R_ABORT_UNLESS(threadStart(&pmdmtThread));
     R_ABORT_UNLESS(threadStart(&tuneThread));
 
@@ -96,24 +83,17 @@ int main(int argc, char *argv[]) {
 
     tune::impl::Exit();
     svcCancelSynchronization(gpioThread.handle);
-    svcCancelSynchronization(pscmThread.handle);
 
     R_ABORT_UNLESS(threadWaitForExit(&gpioThread));
-    R_ABORT_UNLESS(threadWaitForExit(&pscmThread));
     R_ABORT_UNLESS(threadWaitForExit(&pmdmtThread));
     R_ABORT_UNLESS(threadWaitForExit(&tuneThread));
 
     R_ABORT_UNLESS(threadClose(&gpioThread));
-    R_ABORT_UNLESS(threadClose(&pscmThread));
     R_ABORT_UNLESS(threadClose(&pmdmtThread));
     R_ABORT_UNLESS(threadClose(&tuneThread));
 
     /* Close gpio session. */
     gpioPadClose(&headphone_detect_session);
-
-    /* Unregister Psc module. */
-    pscPmModuleFinalize(&pm_module);
-    pscPmModuleClose(&pm_module);
 
     return 0;
 }
