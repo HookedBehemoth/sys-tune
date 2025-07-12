@@ -38,8 +38,9 @@ class Source {
     bool SetupResampler(u32 output_channels, u32 output_sample_rate);
     s64 Resample(u8* out, std::size_t size);
 
-    size_t Read(void *buffer, size_t read_size);
-    bool Seek(int offset, bool set);
+    size_t ReadFile(void *buffer, size_t read_size);
+    s64 TellFile();
+    bool SeekFile(s64 offset, int origin);
 
     virtual bool IsOpen() = 0;
     virtual size_t Decode(size_t sample_count, s16 *data) = 0;

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <strings.h>
 
+// NOTE: when updating dr_libs, check for TUNE-FIX comment for patches.
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_OGG
 #define DR_FLAC_NO_STDIO
@@ -23,25 +24,50 @@ namespace {
     size_t ReadCallback(void *pUserData, void *pBufferOut, size_t bytesToRead) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Read(pBufferOut, bytesToRead);
+        return data->ReadFile(pBufferOut, bytesToRead);
     }
 
     drflac_bool32 FlacSeekCallback(void *pUserData, int offset, drflac_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drflac_seek_origin_start);
+        return data->SeekFile(offset, origin);
+    }
+
+    drflac_bool32 FlacTellCallback(void *pUserData, drflac_int64* pCursor) {
+        auto data = static_cast<Source *>(pUserData);
+
+        *pCursor = data->TellFile();
+        return true;
     }
 
     drmp3_bool32 Mp3SeekCallback(void *pUserData, int offset, drmp3_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drmp3_seek_origin_start);
+        return data->SeekFile(offset, origin);
+    }
+
+    drmp3_bool32 Mp3TellCallback(void *pUserData, drmp3_int64* pCursor) {
+        auto data = static_cast<Source *>(pUserData);
+
+        *pCursor = data->TellFile();
+        return true;
+    }
+
+    void Mp3MetaCallback(void *pUserData, const drmp3_metadata* pMetadata) {
+        // stubbed for now, will handle later to load album artwork.
     }
 
     drwav_bool32 WavSeekCallback(void *pUserData, int offset, drwav_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
-        return data->Seek(offset, origin == drwav_seek_origin_start);
+        return data->SeekFile(offset, origin);
+    }
+
+    drwav_bool32 WavTellCallback(void *pUserData, drwav_int64* pCursor) {
+        auto data = static_cast<Source *>(pUserData);
+
+        *pCursor = data->TellFile();
+        return true;
     }
 
 #ifdef DEBUG
@@ -130,7 +156,7 @@ s64 Source::Resample(u8* out, std::size_t size) {
     return data_read;
 }
 
-size_t Source::Read(void *buffer, size_t read_size) {
+size_t Source::ReadFile(void *buffer, size_t read_size) {
     size_t bytes_read = 0;
     if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read))) {
         this->m_offset += bytes_read;
@@ -140,17 +166,32 @@ size_t Source::Read(void *buffer, size_t read_size) {
     }
 }
 
-bool Source::Seek(int offset, bool set) {
-    s64 absolute = offset;
-    if (!set)
-        absolute += this->m_offset;
+bool Source::SeekFile(s64 offset, int origin) {
+    s64 new_offset;
+    switch (origin) {
+        case DRWAV_SEEK_SET:
+            new_offset = offset;
+            break;
+        case DRWAV_SEEK_CUR:
+            new_offset = this->m_offset + offset;
+            break;
+        case DRWAV_SEEK_END:
+            new_offset = this->m_size + offset;
+            break;
+        default:
+            return false;
+    }
 
-    if (absolute < this->m_size) {
-        this->m_offset = absolute;
+    if (new_offset <= this->m_size) {
+        this->m_offset = new_offset;
         return true;
     } else {
         return false;
     }
+}
+
+s64 Source::TellFile() {
+    return this->m_offset;
 }
 
 bool Source::Done() {
@@ -165,7 +206,7 @@ class FlacFile final : public Source {
 
   public:
     FlacFile(FsFile &&file) : Source(std::move(file)) {
-        this->m_flac = drflac_open(ReadCallback, FlacSeekCallback, this, flac_alloc_ptr);
+        this->m_flac = drflac_open(ReadCallback, FlacSeekCallback, FlacTellCallback, this, flac_alloc_ptr);
     }
     ~FlacFile() {
         if (this->m_flac != nullptr)
@@ -211,7 +252,7 @@ class Mp3File final : public Source {
 
   public:
     Mp3File(FsFile &&file) : Source(std::move(file)) {
-        if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, this, mp3_alloc_ptr)) {
+        if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, Mp3TellCallback, Mp3MetaCallback, this, mp3_alloc_ptr)) {
             this->m_total_frame_count = drmp3_get_pcm_frame_count(&this->m_mp3);
             this->initialized         = true;
         }
@@ -260,7 +301,7 @@ class WavFile final : public Source {
 
   public:
     WavFile(FsFile &&file) : Source(std::move(file)) {
-        if (drwav_init(&this->m_wav, ReadCallback, WavSeekCallback, this, wav_alloc_ptr)) {
+        if (drwav_init(&this->m_wav, ReadCallback, WavSeekCallback, WavTellCallback, this, wav_alloc_ptr)) {
             this->m_bytes_per_pcm = drwav_get_bytes_per_pcm_frame(&this->m_wav);
             this->initialized     = true;
         }
