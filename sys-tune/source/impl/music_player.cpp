@@ -17,6 +17,7 @@ namespace tune::impl {
     namespace {
         constexpr float VOLUME_MAX = 1.f;
         constexpr auto PLAYLIST_ENTRY_MAX = 512; // 128k
+        constexpr auto PATH_SIZE_MAX = 256;
 
         struct PlaylistID {
             u32 id{UINT32_MAX};
@@ -187,7 +188,7 @@ namespace tune::impl {
                 }
 
             private:
-                char m_path[256]{};
+                char m_path[PATH_SIZE_MAX]{};
             };
 
         private:
@@ -314,7 +315,7 @@ namespace tune::impl {
 
     void TuneThreadFunc(void *) {
         {
-            char load_path[512];
+            char load_path[PATH_SIZE_MAX];
             if (config::get_load_path(load_path, sizeof(load_path))) {
                 // check if the path is a file or folder.
                 FsDirEntryType type;
@@ -332,7 +333,7 @@ namespace tune::impl {
                             std::vector<FsDirectoryEntry> entries(std::min(64, PLAYLIST_ENTRY_MAX));
 
                             s64 total;
-                            char full_path[512];
+                            char full_path[PATH_SIZE_MAX];
                             while (R_SUCCEEDED(fsDirRead(&dir, &total, entries.size(), entries.data())) && total) {
                                 for (s64 i = 0; i < total; i++) {
                                     if (GetSourceType(entries[i].name) != SourceType::NONE) {

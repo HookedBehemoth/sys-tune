@@ -19,6 +19,7 @@
 static int SDL_OutOfMemoryEX() { return -1; }
 #ifndef NDEBUG
 #include <stdio.h>
+#error [TUNE] NDEBUG not set
 static int SDL_PrintError(const char* e) { printf(e);  return -1; }
 #else
 static int SDL_PrintError(const char* e) { (void)e;  return -1; }
@@ -70,16 +71,16 @@ static int SDL_PrepareResampleFilter(void);
 #endif
 
 /* Function pointers set to a CPU-specific implementation. */
-SDL_AudioFilter_EX SDL_Convert_S8_to_F32 = NULL;
-SDL_AudioFilter_EX SDL_Convert_U8_to_F32 = NULL;
-SDL_AudioFilter_EX SDL_Convert_S16_to_F32 = NULL;
-SDL_AudioFilter_EX SDL_Convert_U16_to_F32 = NULL;
-SDL_AudioFilter_EX SDL_Convert_S32_to_F32 = NULL;
-SDL_AudioFilter_EX SDL_Convert_F32_to_S8 = NULL;
-SDL_AudioFilter_EX SDL_Convert_F32_to_U8 = NULL;
-SDL_AudioFilter_EX SDL_Convert_F32_to_S16 = NULL;
-SDL_AudioFilter_EX SDL_Convert_F32_to_U16 = NULL;
-SDL_AudioFilter_EX SDL_Convert_F32_to_S32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_S8_to_F32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_U8_to_F32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_S16_to_F32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_U16_to_F32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_S32_to_F32 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_F32_to_S8 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_F32_to_U8 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_F32_to_S16 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_F32_to_U16 = NULL;
+static SDL_AudioFilter_EX SDL_Convert_F32_to_S32 = NULL;
 
 
 #define DIVBY128 0.0078125f
@@ -1607,7 +1608,7 @@ AllocateDataQueuePacket(SDL_DataQueue *queue)
     packet->datalen = 0;
     packet->startpos = 0;
     packet->next = NULL;
-                
+
     assert((queue->head != NULL) == (queue->queued_bytes != 0));
     if (queue->tail == NULL) {
         queue->head = packet;
@@ -2767,7 +2768,7 @@ SDL_BuildAudioCVT_EX(SDL_AudioCVT_EX * cvt,
            handled by now, but let's be defensive */
       return SDL_PrintError("Invalid channel combination");
     }
-    
+
     /* Do rate conversion, if necessary. Updates (cvt). */
     if (SDL_BuildAudioResampleCVT(cvt, dst_channels, src_rate, dst_rate) < 0) {
         return -1;              /* shouldn't happen, but just in case... */
@@ -3248,7 +3249,7 @@ SDL_AudioStreamPutEX(SDL_AudioStream *stream, const void *buf, int len)
             stream->staging_buffer_filled += len;
             return 0;
         }
- 
+
         /* Fill the staging buffer, process it, and continue */
         amount = (stream->staging_buffer_size - stream->staging_buffer_filled);
         assert(amount > 0);

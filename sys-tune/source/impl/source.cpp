@@ -5,20 +5,32 @@
 #include <cstring>
 
 // NOTE: when updating dr_libs, check for TUNE-FIX comment for patches.
+#ifdef WANT_FLAC
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_OGG
 #define DR_FLAC_NO_STDIO
 #include "dr_flac.h"
+#endif
 
+#ifdef WANT_MP3
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
 #include "dr_mp3.h"
+#endif
 
+#ifdef WANT_WAV
 #define DR_WAV_IMPLEMENTATION
 #define DR_WAV_NO_STDIO
 #include "dr_wav.h"
+#endif
 
 namespace {
+
+    enum SeekOrigin {
+        SeekOrigin_SET,
+        SeekOrigin_CUR,
+        SeekOrigin_END
+    };
 
     size_t ReadCallback(void *pUserData, void *pBufferOut, size_t bytesToRead) {
         auto data = static_cast<Source *>(pUserData);
@@ -26,6 +38,7 @@ namespace {
         return data->ReadFile(pBufferOut, bytesToRead);
     }
 
+#ifdef WANT_FLAC
     drflac_bool32 FlacSeekCallback(void *pUserData, int offset, drflac_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
@@ -38,7 +51,9 @@ namespace {
         *pCursor = data->TellFile();
         return true;
     }
+#endif
 
+#ifdef WANT_MP3
     drmp3_bool32 Mp3SeekCallback(void *pUserData, int offset, drmp3_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
@@ -55,7 +70,9 @@ namespace {
     void Mp3MetaCallback(void *pUserData, const drmp3_metadata* pMetadata) {
         // stubbed for now, will handle later to load album artwork.
     }
+#endif
 
+#ifdef WANT_WAV
     drwav_bool32 WavSeekCallback(void *pUserData, int offset, drwav_seek_origin origin) {
         auto data = static_cast<Source *>(pUserData);
 
@@ -68,6 +85,7 @@ namespace {
         *pCursor = data->TellFile();
         return true;
     }
+#endif
 
 #ifdef DEBUG
     void *log_malloc(size_t sz, void *) {
@@ -101,9 +119,15 @@ namespace {
     constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr   = &mp3_alloc;
     constexpr const drwav_allocation_callbacks *wav_alloc_ptr   = &wav_alloc;
 #else
+#ifdef WANT_FLAC
     constexpr const drflac_allocation_callbacks *flac_alloc_ptr = nullptr;
+#endif
+#ifdef WANT_MP3
     constexpr const drmp3_allocation_callbacks *mp3_alloc_ptr   = nullptr;
+#endif
+#ifdef WANT_WAV
     constexpr const drwav_allocation_callbacks *wav_alloc_ptr   = nullptr;
+#endif
 #endif
 
 }
@@ -168,13 +192,13 @@ size_t Source::ReadFile(void *buffer, size_t read_size) {
 bool Source::SeekFile(s64 offset, int origin) {
     s64 new_offset;
     switch (origin) {
-        case DRWAV_SEEK_SET:
+        case SeekOrigin_SET:
             new_offset = offset;
             break;
-        case DRWAV_SEEK_CUR:
+        case SeekOrigin_CUR:
             new_offset = this->m_offset + offset;
             break;
-        case DRWAV_SEEK_END:
+        case SeekOrigin_END:
             new_offset = this->m_size + offset;
             break;
         default:
@@ -199,6 +223,7 @@ bool Source::Done() {
     return current == total;
 }
 
+#ifdef WANT_FLAC
 class FlacFile final : public Source {
   private:
     drflac *m_flac;
@@ -242,7 +267,9 @@ class FlacFile final : public Source {
         return this->m_flac->channels;
     }
 };
+#endif
 
+#ifdef WANT_MP3
 class Mp3File final : public Source {
   private:
     drmp3 m_mp3;
@@ -291,7 +318,9 @@ class Mp3File final : public Source {
         return this->m_mp3.channels;
     }
 };
+#endif
 
+#ifdef WANT_WAV
 class WavFile final : public Source {
   private:
     drwav m_wav;
@@ -341,6 +370,7 @@ class WavFile final : public Source {
         return this->m_wav.channels;
     }
 };
+#endif
 
 std::unique_ptr<Source> OpenFile(const char *path) {
     const auto type = GetSourceType(path);
