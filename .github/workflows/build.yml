@@ -1,6 +1,6 @@
 name: Build sys-tune and overlay
 
-on: [push]
+on: [push, pull_request]
 jobs:
   build:
 
@@ -23,7 +23,9 @@ jobs:
         cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/
         cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 
-    - uses: actions/upload-artifact@master
+    - name: Deploy
+      if: ${{ github.event_name != 'pull_request' && github.event.action != 'unassigned' }}
+      uses: actions/upload-artifact@master
       with:
         name: sys-tune
         path: dist

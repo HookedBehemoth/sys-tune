@@ -25,12 +25,11 @@ module:
 
 dist: all
 	mkdir -p dist/switch/.overlays
-	mkdir -p dist/atmosphere/contents/4200000000000000
-	# mkdir -p dist/atmosphere/contents/4200000000000000/flags
+	mkdir -p dist/atmosphere/contents/4200000000000000/flags
+	touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
 	cp sys-tune/sys-tune.nsp dist/atmosphere/contents/4200000000000000/exefs.nsp
 	cp overlay/sys-tune-overlay.ovl dist/switch/.overlays/
 	cp sys-tune/toolbox.json dist/atmosphere/contents/4200000000000000/
-	# touch dist/atmosphere/contents/4200000000000000/flags/boot2.flag
 	cd dist; zip -r sys-tune-$(VERSION)-$(GITHASH).zip ./**/; cd ../;
 	-hactool -t nso sys-tune/sys-tune.nso
 
