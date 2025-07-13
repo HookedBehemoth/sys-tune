@@ -18,81 +18,183 @@ namespace tune::impl {
         constexpr float VOLUME_MAX = 1.f;
         constexpr auto PLAYLIST_ENTRY_MAX = 512; // 128k
 
-        struct PlayListEntry2 {
+        struct PlaylistID {
+            u32 id{UINT32_MAX};
+
+            bool IsValid() const {
+                return id != UINT32_MAX;
+            }
+
+            void Reset() {
+                id = UINT32_MAX;
+            }
+        };
+
+        class PlayList {
         public:
-            // in most cases, the path will not exceed 256 bytes,
-            // so this is a reasonable max rather than 0x301.
-            bool Add(const char* path) {
-                if (!IsEmpty()) {
+            bool Add(const char* path, EnqueueType type) {
+                u32 index;
+                if (!FindNextFreeEntry(index)) {
                     return false;
                 }
 
-                if (std::strlen(path) > sizeof(m_path)) {
+                if (!m_entries[index].Add(path)) {
                     return false;
                 }
 
-                std::strcpy(m_path, path);
+                if (type == EnqueueType::Front) {
+                    m_playlist.emplace(m_playlist.cbegin(), index);
+                } else {
+                    m_playlist.emplace_back(index);
+                }
+
+                // add new entry id to shuffle_playlist_list
+                const auto shuffle_playlist_size = m_shuffle_playlist.size() + 1;
+                const auto shuffle_index = randomGet64() % shuffle_playlist_size;
+                m_shuffle_playlist.emplace(m_shuffle_playlist.cbegin() + shuffle_index, index);
+
                 return true;
             }
 
-            void Remove() {
-                m_path[0] = '\0';
+            bool Remove(u32 index, ShuffleMode shuffle) {
+                const auto entry = Get(index, shuffle);
+                R_UNLESS(entry.IsValid(), false);
+
+                // remove entry.
+                m_entries[entry.id].Remove();
+
+                // remove from both playlists.
+                if (shuffle == ShuffleMode::On) {
+                    m_playlist.erase(m_playlist.begin() + GetIndexFromID(entry, ShuffleMode::Off));
+                    m_shuffle_playlist.erase(m_shuffle_playlist.begin() + index);
+                } else {
+                    m_playlist.erase(m_playlist.begin() + index);
+                    m_shuffle_playlist.erase(m_shuffle_playlist.begin() + GetIndexFromID(entry, ShuffleMode::On));
+                }
+
+                return true;
             }
 
-            bool IsEmpty() const {
-                return m_path[0] == '\0';
-            }
-
-        // private:
-            char m_path[256]{};
-        };
-
-        struct PlayList {
-            std::array<PlayListEntry2, PLAYLIST_ENTRY_MAX> m_entries{};
-
-            bool Add(u32 index, const char* path) {
-                if (index > m_entries.size()) {
+            bool Swap(u32 src, u32 dst, ShuffleMode shuffle) {
+                if (src >= Size() || dst >+ Size()) {
                     return false;
                 }
 
-                return m_entries[index].Add(path);
-            }
-
-            void Remove(u32 index) {
-                if (index > m_entries.size()) {
-                    return;
+                if (shuffle == ShuffleMode::On) {
+                    std::swap(m_shuffle_playlist[src], m_shuffle_playlist[dst]);
+                } else {
+                    std::swap(m_playlist[src], m_playlist[dst]);
                 }
 
-                return m_entries[index].Remove();
+                return true;
             }
 
-            s32 FindNextFreeEntry() const {
-                for (u32 i = 0; i < m_entries.size(); i++) {
-                    if (m_entries[i].IsEmpty()) {
-                        return i;
-                    }
-                }
-
-                return -1;
+            const char* GetPath(u32 index, ShuffleMode shuffle) const {
+                return GetPath(Get(index, shuffle));
             }
 
-            const char* GetPath(u32 index) {
-                return m_entries[index].m_path;
+            const char* GetPath(const PlaylistID& entry) const {
+                R_UNLESS(entry.IsValid(), nullptr);
+
+                return m_entries[entry.id].GetPath();
             }
 
             void Clear() {
                 for (u32 i = 0; i < m_entries.size(); i++) {
                     m_entries[i].Remove();
                 }
+
+                m_playlist.clear();
+                m_shuffle_playlist.clear();
             }
+
+            u32 Size() const {
+                return m_playlist.size();
+            }
+
+            PlaylistID Get(u32 index, ShuffleMode shuffle) const {
+                if (index >= Size()) {
+                    return {};
+                }
+
+                if (shuffle == ShuffleMode::On) {
+                    return m_shuffle_playlist[index];
+                } else {
+                    return m_playlist[index];
+                }
+            }
+
+            u32 GetIndexFromID(const PlaylistID& entry, ShuffleMode shuffle) const {
+                std::span list{m_playlist};
+                if (shuffle == ShuffleMode::On) {
+                    list = m_shuffle_playlist;
+                }
+
+                for (u32 i = 0; i < list.size(); i++) {
+                    if (list[i].id == entry.id) {
+                        return i;
+                    }
+                }
+
+                return 0;
+            }
+
+        private:
+            bool FindNextFreeEntry(u32& index) const {
+                for (u32 i = 0; i < m_entries.size(); i++) {
+                    if (m_entries[i].IsEmpty()) {
+                        index = i;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+        private:
+            struct PlayListNameEntry {
+            public:
+                // in most cases, the path will not exceed 256 bytes,
+                // so this is a reasonable max rather than 0x301.
+                bool Add(const char* path) {
+                    if (!IsEmpty()) {
+                        return false;
+                    }
+
+                    if (std::strlen(path) >= sizeof(m_path)) {
+                        return false;
+                    }
+
+                    std::strcpy(m_path, path);
+                    return true;
+                }
+
+                bool Remove() {
+                    m_path[0] = '\0';
+                    return true;
+                }
+
+                bool IsEmpty() const {
+                    return m_path[0] == '\0';
+                }
+
+                const char* GetPath() const {
+                    return m_path;
+                }
+
+            private:
+                char m_path[256]{};
+            };
+
+        private:
+            std::vector<PlaylistID> m_playlist{};
+            std::vector<PlaylistID> m_shuffle_playlist{};
+            std::array<PlayListNameEntry, PLAYLIST_ENTRY_MAX> m_entries{};
         };
 
-        PlayList g_playlist2;
+        PlayList g_playlist;
 
-        // todo: move below into playlist struct
-        std::vector<PlaylistEntry> g_playlist;
-        std::vector<PlaylistID> g_shuffle_playlist;
-        PlaylistEntry g_current;
+        PlaylistID g_current;
         u32 g_queue_position;
 
         LockableMutex g_mutex;
@@ -109,7 +211,7 @@ namespace tune::impl {
         constexpr auto AUDIO_FREQ          = 48000;
         constexpr auto AUDIO_CHANNEL_COUNT = 2;
         constexpr auto AUDIO_BUFFER_COUNT  = 2;
-        constexpr auto AUDIO_LATENCY_MS    = 50;
+        constexpr auto AUDIO_LATENCY_MS    = 42;
         constexpr auto AUDIO_BUFFER_SIZE   = AUDIO_FREQ / 1000 * AUDIO_LATENCY_MS * AUDIO_CHANNEL_COUNT;
 
         AudioOutBuffer g_audout_buffer[AUDIO_BUFFER_COUNT];
@@ -190,9 +292,6 @@ namespace tune::impl {
         R_TRY(audoutInitialize());
         SetVolume(config::get_volume());
 
-        g_playlist.reserve(PLAYLIST_ENTRY_MAX);
-        g_shuffle_playlist.reserve(PLAYLIST_ENTRY_MAX);
-
         /* Fetch values from config, sanitize the return value */
         if (auto c = config::get_repeat(); c <= 2 && c >= 0) {
             SetRepeatMode(static_cast<RepeatMode>(c));
@@ -216,25 +315,14 @@ namespace tune::impl {
             {
                 std::scoped_lock lk(g_mutex);
 
-                const auto &queue = g_playlist;
-                const auto queue_size = queue.size();
+                const auto queue_size = g_playlist.Size();
                 if (queue_size == 0) {
                     g_current.Reset();
                 } else if (g_queue_position >= queue_size) {
                     g_queue_position = queue_size - 1;
                     continue;
                 } else {
-                    if (g_shuffle == ShuffleMode::On) {
-                        const auto shuffle_id = g_shuffle_playlist[g_queue_position];
-                        for (u32 i = 0; i < g_playlist.size(); i++) {
-                            if (g_playlist[i].id == shuffle_id) {
-                                g_current = g_playlist[i];
-                                break;
-                            }
-                        }
-                    } else {
-                        g_current = queue[g_queue_position];
-                    }
+                    g_current = g_playlist.Get(g_queue_position, g_shuffle);
                 }
             }
 
@@ -246,17 +334,12 @@ namespace tune::impl {
 
             g_status = PlayerStatus::Playing;
             /* Only play if playing and we have a track queued. */
-            Result rc = PlayTrack(g_playlist2.GetPath(g_current.id));
+            Result rc = PlayTrack(g_playlist.GetPath(g_current));
 
             /* Log error. */
             if (R_FAILED(rc)) {
                 /* Remove track if something went wrong. */
-                bool shuffle = g_shuffle == ShuffleMode::On;
-                if (shuffle)
-                    SetShuffleMode(ShuffleMode::Off);
                 Remove(g_queue_position);
-                if (shuffle)
-                    SetShuffleMode(ShuffleMode::On);
             }
         }
 
@@ -340,7 +423,7 @@ namespace tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            if (g_queue_position < g_playlist.size() - 1) {
+            if (g_queue_position < g_playlist.Size() - 1) {
                 g_queue_position++;
             } else {
                 g_queue_position = 0;
@@ -359,7 +442,7 @@ namespace tune::impl {
             if (g_queue_position > 0) {
                 g_queue_position--;
             } else {
-                g_queue_position = g_playlist.size() - 1;
+                g_queue_position = g_playlist.Size() - 1;
             }
         }
         g_status     = PlayerStatus::FetchNext;
@@ -419,16 +502,16 @@ namespace tune::impl {
     u32 GetPlaylistSize() {
         std::scoped_lock lk(g_mutex);
 
-        return g_playlist.size();
+        return g_playlist.Size();
     }
 
     Result GetPlaylistItem(u32 index, char *buffer, size_t buffer_size) {
         std::scoped_lock lk(g_mutex);
 
-        if (index >= g_playlist.size())
-            return tune::OutOfRange;
+        const auto path = g_playlist.GetPath(index, g_shuffle);
+        R_UNLESS(path, tune::OutOfRange);
 
-        std::strncpy(buffer, g_playlist2.GetPath(index), buffer_size);
+        std::snprintf(buffer, buffer_size, "%s", path);
 
         return 0;
     }
@@ -439,9 +522,11 @@ namespace tune::impl {
 
         {
             std::scoped_lock lk(g_mutex);
-            R_UNLESS(g_current.IsValid(), tune::NotPlaying);
-            // R_UNLESS(buffer_size >= g_current.path.size(), tune::InvalidArgument);
-            std::strcpy(buffer, g_playlist2.GetPath(g_current.id));
+
+            const auto path = g_playlist.GetPath(g_current);
+            R_UNLESS(path, tune::NotPlaying);
+
+            std::snprintf(buffer, buffer_size, "%s", path);
         }
 
         auto [current, total] = g_source->Tell();
@@ -458,43 +543,21 @@ namespace tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            g_playlist.clear();
-            g_shuffle_playlist.clear();
-            g_playlist2.Clear();
+            g_playlist.Clear();
         }
         g_status = PlayerStatus::FetchNext;
     }
 
+    // currently unused (and untested).
     void MoveQueueItem(u32 src, u32 dst) {
         std::scoped_lock lk(g_mutex);
 
-        const auto queue_size = g_playlist.size();
-
-        if (src >= queue_size) {
-            src = queue_size - 1;
-        }
-        if (dst >= queue_size) {
-            dst = queue_size - 1;
+        if (!g_playlist.Swap(src, dst, g_shuffle)) {
+            return;
         }
 
-        auto source = g_playlist.cbegin() + src;
-        auto dest   = g_playlist.cbegin() + dst;
-
-        g_playlist.insert(dest, *source);
-        g_playlist.erase(source);
-
-        if (src < dst) {
-            if (g_queue_position == src) {
-                g_queue_position = dst;
-            } else if (g_queue_position >= src && g_queue_position <= dst) {
-                g_queue_position--;
-            }
-        } else if (dst < src) {
-            if (g_queue_position == src) {
-                g_queue_position = dst;
-            } else if (g_queue_position >= dst && g_queue_position <= src) {
-                g_queue_position++;
-            }
+        if (g_queue_position == src) {
+            g_queue_position = dst;
         }
     }
 
@@ -502,30 +565,13 @@ namespace tune::impl {
         {
             std::scoped_lock lk(g_mutex);
 
-            /* Check if we are out of bounds. */
-            size_t queue_size = g_playlist.size();
-            if (index >= queue_size) {
-                index = queue_size - 1;
-            }
-
-            /* Get absolute position in current playlist. Independent of shufflemode. */
-            u32 pos = index;
-
-            if (g_shuffle == ShuffleMode::On) {
-                const auto track = g_playlist.cbegin() + index;
-                for (u32 i = 0; i < g_shuffle_playlist.size(); i++) {
-                    if (g_shuffle_playlist[i] == track->id) {
-                        pos = i;
-                        break;
-                    }
-                }
-            }
-
-            /* Return if that track is already selected. */
-            if (g_queue_position == pos)
+            const auto size = g_playlist.Size();
+            if (!size) {
                 return;
+            }
 
-            g_queue_position = pos;
+            // adjust to index-1 so that FetchNext will jump to it.
+            g_queue_position = std::clamp<s32>(index - 1, 0, size - 1);
         }
         g_status     = PlayerStatus::FetchNext;
         g_should_pause = false;
@@ -543,33 +589,15 @@ namespace tune::impl {
 
         std::scoped_lock lk(g_mutex);
 
-        const auto new_id = g_playlist2.FindNextFreeEntry();
-        if (new_id < 0) {
+        if (!g_playlist.Add(buffer, type)) {
             return tune::OutOfMemory;
         }
 
-        if (!g_playlist2.Add(new_id, buffer)) {
-            return tune::OutOfMemory;
+        // check if the current position still points to the same entry, update if not.
+        if (g_current.IsValid() && g_current.id != g_playlist.Get(g_queue_position, g_shuffle).id) {
+            g_queue_position = g_playlist.GetIndexFromID(g_current, g_shuffle);
+            g_current = g_playlist.Get(g_queue_position, g_shuffle);
         }
-
-        const PlaylistEntry new_entry{
-            .id = static_cast<PlaylistID>(new_id)
-        };
-
-        // add new entry to playlist
-        if (type == EnqueueType::Front) {
-            g_playlist.emplace(g_playlist.cbegin(), new_entry);
-            if (g_shuffle == ShuffleMode::Off) {
-                g_queue_position++;
-            }
-        } else {
-            g_playlist.emplace_back(new_entry);
-        }
-
-        // add new entry id to shuffle_playlist_list
-        const auto shuffle_playlist_size = g_shuffle_playlist.size();
-        const auto shuffle_index = (shuffle_playlist_size > 1) ? (randomGet64() % shuffle_playlist_size) : 0;
-        g_shuffle_playlist.emplace(g_shuffle_playlist.cbegin() + shuffle_index, new_id);
 
         return 0;
     }
@@ -578,31 +606,14 @@ namespace tune::impl {
         std::scoped_lock lk(g_mutex);
 
         /* Ensure we don't operate out of bounds. */
-        R_UNLESS(!g_playlist.empty(), tune::QueueEmpty);
-        R_UNLESS(index < g_playlist.size(), tune::OutOfRange);
+        R_UNLESS(g_playlist.Size(), tune::QueueEmpty);
 
-        /* Get iterator for index position. */
-        const auto track = g_playlist.cbegin() + index;
-        g_playlist2.Remove(track->id);
-
-        for (u32 i = 0; i < g_shuffle_playlist.size(); i++) {
-            if (g_shuffle_playlist[i] == track->id) {
-                const auto shuffle_it = g_shuffle_playlist.cbegin() + i;
-                // we are playing from shuffle list so use that index instead
-                if (g_shuffle == ShuffleMode::On) {
-                    index = i;
-                }
-                // finally remove
-                g_shuffle_playlist.erase(shuffle_it);
-                break;
-            }
+        if (!g_playlist.Remove(index, g_shuffle)) {
+            return tune::OutOfRange;
         }
 
-        /* Remove entry. */
-        g_playlist.erase(track);
-
         /* Fetch a new track if we deleted the current song. */
-        bool fetch_new = g_queue_position == index;
+        const bool fetch_new = g_queue_position == index;
 
         /* Lower current position if needed. */
         if (g_queue_position > index) {

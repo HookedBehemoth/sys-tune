@@ -5,19 +5,6 @@
 #include <vector>
 
 namespace tune::impl {
-    using PlaylistID = u32;
-
-    struct PlaylistEntry {
-        PlaylistID id{UINT32_MAX};
-
-        bool IsValid() const {
-            return id != UINT32_MAX;
-        }
-
-        void Reset() {
-            id = UINT32_MAX;
-        }
-    };
 
     Result Initialize();
     void Exit();
