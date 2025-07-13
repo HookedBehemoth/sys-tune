@@ -102,7 +102,7 @@ void BrowserGui::scanCwd() {
 
     /* Open directory. */
     FsDir dir;
-    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, &dir);
+    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles | FsDirOpenMode_NoFileSize, &dir);
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -116,38 +116,42 @@ void BrowserGui::scanCwd() {
 
     /* Iternate over directory. */
     s64 count = 0;
-    FsDirectoryEntry entry;
-    while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count) {
-        if (entry.type == FsDirEntryType_Dir) {
-            /* Add directory entries. */
-            auto item = new tsl::elm::ListItem(entry.name);
-            item->setClickListener([this, item](u64 down) -> bool {
-                if (down & HidNpadButton_A) {
-                    std::strncat(this->cwd, item->getText().c_str(), sizeof(this->cwd) - 1);
-                    std::strncat(this->cwd, "/", sizeof(this->cwd) - 1);
-                    this->scanCwd();
-                    return true;
-                }
-                return false;
-            });
-            folders.push_back(item);
-        } else if (SupportsType(entry.name)) {
-            /* Add file entry. */
-            auto item = new tsl::elm::ListItem(entry.name);
-            item->setClickListener([this, item](u64 down) -> bool {
-                if (down & HidNpadButton_A) {
-                    std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
-                    Result rc = tuneEnqueue(path_buffer, TuneEnqueueType_Back);
-                    if (R_SUCCEEDED(rc)) {
-                        m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
-                    } else {
-                        m_frame->setToast("Failed to add Track.", "Does the name contain umlauts?");
+    std::vector<FsDirectoryEntry> entries(64);
+
+    while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
+        for (s64 i = 0; i < count; i++) {
+            const auto& entry = entries[i];
+            if (entry.type == FsDirEntryType_Dir) {
+                /* Add directory entries. */
+                auto item = new tsl::elm::ListItem(entry.name);
+                item->setClickListener([this, item](u64 down) -> bool {
+                    if (down & HidNpadButton_A) {
+                        std::strncat(this->cwd, item->getText().c_str(), sizeof(this->cwd) - 1);
+                        std::strncat(this->cwd, "/", sizeof(this->cwd) - 1);
+                        this->scanCwd();
+                        return true;
                     }
-                    return true;
-                }
-                return false;
-            });
-            files.push_back(item);
+                    return false;
+                });
+                folders.push_back(item);
+            } else if (SupportsType(entry.name)) {
+                /* Add file entry. */
+                auto item = new tsl::elm::ListItem(entry.name);
+                item->setClickListener([this, item](u64 down) -> bool {
+                    if (down & HidNpadButton_A) {
+                        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
+                        Result rc = tuneEnqueue(path_buffer, TuneEnqueueType_Back);
+                        if (R_SUCCEEDED(rc)) {
+                            m_frame->setToast("Playlist updated", "Added 1 song to Playlist.");
+                        } else {
+                            m_frame->setToast("Failed to add Track.", "Does the name contain umlauts?");
+                        }
+                        return true;
+                    }
+                    return false;
+                });
+                files.push_back(item);
+            }
         }
     }
     if (folders.size() == 0 && files.size() == 0) {
@@ -184,7 +188,7 @@ void BrowserGui::upCwd() {
 
 void BrowserGui::addAllToPlaylist() {
     FsDir dir;
-    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadFiles, &dir);
+    Result rc = fsFsOpenDirectory(&this->m_fs, this->cwd, FsDirOpenMode_ReadFiles|FsDirOpenMode_NoFileSize, &dir);
     if (R_FAILED(rc)) {
         char result_buffer[0x10];
         std::snprintf(result_buffer, 0x10, "2%03X-%04X", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -197,11 +201,15 @@ void BrowserGui::addAllToPlaylist() {
     std::vector<std::string> file_list;
     s64 songs_added = 0;
     s64 count = 0;
-    FsDirectoryEntry entry;
-    while (R_SUCCEEDED(fsDirRead(&dir, &count, 1, &entry)) && count){
-        if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
-            file_list.push_back(std::string(entry.name));
-            count++;
+    std::vector<FsDirectoryEntry> entries(64);
+
+    while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count){
+        for (s64 i = 0; i < count; i++) {
+            const auto& entry = entries[i];
+            if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
+                file_list.push_back(std::string(entry.name));
+                count++;
+            }
         }
     }
 
