@@ -24,10 +24,19 @@ namespace sdmc {
         return fsFsOpenFile(&sdmc, path_buffer, open_mode, file);
     }
 
-    bool FileExists(const char* path) {
+    Result OpenDir(FsDir *dir, const char *path, int open_mode) {
         std::strcpy(path_buffer, path);
+        return fsFsOpenDirectory(&sdmc, path_buffer, open_mode, dir);
+    }
+
+    Result GetType(const char* path, FsDirEntryType* type) {
+        std::strcpy(path_buffer, path);
+        return fsFsGetEntryType(&sdmc, path_buffer, type);;
+    }
+
+    bool FileExists(const char* path) {
         FsDirEntryType type;
-        return R_SUCCEEDED(fsFsGetEntryType(&sdmc, path_buffer, &type)) && type == FsDirEntryType_File;
+        return R_SUCCEEDED(GetType(path, &type)) && type == FsDirEntryType_File;
     }
 
     Result CreateFolder(const char* path) {
