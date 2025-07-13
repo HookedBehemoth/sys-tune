@@ -122,6 +122,10 @@ void BrowserGui::scanCwd() {
     const u64 max = 2048; // max items to be added to the array.
     std::vector<FsDirectoryEntry> entries(64);
 
+    // avoid vector allocs / resize in the loop.
+    folders.reserve(max);
+    files.reserve(max);
+
     while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
         for (s64 i = 0; i < count; i++) {
             if (folders.size() + files.size() >= max) {
@@ -238,6 +242,9 @@ void BrowserGui::addAllToPlaylist() {
     s64 count = 0;
     const u64 max = 512; // max set by PLAYLIST_ENTRY_MAX in music_player.cpp
     std::vector<FsDirectoryEntry> entries(64);
+
+    // avoid vector allocs / resize in the loop.
+    file_list.reserve(max);
 
     while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
         for (s64 i = 0; i < count; i++) {

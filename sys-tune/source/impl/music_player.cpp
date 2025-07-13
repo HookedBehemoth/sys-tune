@@ -33,6 +33,12 @@ namespace tune::impl {
 
         class PlayList {
         public:
+            void Init() {
+                Clear();
+                m_playlist.reserve(PLAYLIST_ENTRY_MAX);
+                m_shuffle_playlist.reserve(PLAYLIST_ENTRY_MAX);
+            }
+
             bool Add(const char* path, EnqueueType type) {
                 u32 index;
                 if (!FindNextFreeEntry(index)) {
@@ -304,6 +310,9 @@ namespace tune::impl {
 
         SetShuffleMode(static_cast<ShuffleMode>(config::get_shuffle()));
         SetDefaultTitleVolume(config::get_default_title_volume());
+
+        // reserves memory so that we don't allocate later on.
+        g_playlist.Init();
 
         return 0;
 
