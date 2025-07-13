@@ -115,6 +115,27 @@ tsl::elm::Element *MainGui::createUI() {
 
     list->addItem(new tsl::elm::CategoryHeader("Misc"));
 
+    auto startup_button = new tsl::elm::ListItem("Remove start up file");
+    startup_button->setClickListener([frame](u64 keys) {
+        if (keys & HidNpadButton_A) {
+            char path[512];
+            if (config::get_load_path(path, sizeof(path))) {
+                config::set_load_path("");
+                const auto* p = path;
+                if (auto ext = std::strrchr(path, '/')) {
+                    p = ext + 1;
+                }
+
+                frame->setToast("Removed start up file", p);
+            } else {
+                frame->setToast("Failed to remove start up file", "No start up file set in config");
+            }
+            return true;
+        }
+        return false;
+    });
+    list->addItem(startup_button);
+
     auto exit_button = new tsl::elm::ListItem("Close sys-tune");
     exit_button->setClickListener([](u64 keys) {
         if (keys & HidNpadButton_A) {

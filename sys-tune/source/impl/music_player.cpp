@@ -125,6 +125,10 @@ namespace tune::impl {
             }
 
             u32 GetIndexFromID(const PlaylistID& entry, ShuffleMode shuffle) const {
+                if (!entry.IsValid()) {
+                    return 0;
+                }
+
                 std::span list{m_playlist};
                 if (shuffle == ShuffleMode::On) {
                     list = m_shuffle_playlist;
@@ -580,6 +584,7 @@ namespace tune::impl {
             std::scoped_lock lk(g_mutex);
 
             g_playlist.Clear();
+            g_queue_position = 0;
         }
         g_status = PlayerStatus::FetchNext;
     }
@@ -606,8 +611,7 @@ namespace tune::impl {
                 return;
             }
 
-            // adjust to index-1 so that FetchNext will jump to it.
-            g_queue_position = std::clamp<s32>(index - 1, 0, size - 1);
+            g_queue_position = std::min(index, size - 1);
         }
         g_status     = PlayerStatus::FetchNext;
         g_should_pause = false;

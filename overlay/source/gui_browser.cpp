@@ -1,5 +1,6 @@
 #include "gui_browser.hpp"
 
+#include "config/config.hpp"
 #include "tune.h"
 
 namespace {
@@ -8,7 +9,7 @@ namespace {
         return strcasecmp(_lhs->getText().c_str(), _rhs->getText().c_str()) < 0;
     };
 
-    bool StringTextCompare(std::string _lhs, std::string _rhs) {
+    bool StringTextCompare(const std::string& _lhs, const std::string& _rhs) {
         return strcasecmp(_lhs.c_str(), _rhs.c_str()) < 0;
     };
 
@@ -97,6 +98,8 @@ void BrowserGui::scanCwd() {
     tsl::Gui::removeFocus();
     this->m_list->clear();
 
+    this->m_list->addItem(new tsl::elm::CategoryHeader("\uE0E7  Play selected path on start up", true));
+
     /* Show absolute folder path. */
     this->m_list->addItem(new tsl::elm::CategoryHeader(this->cwd, true));
 
@@ -130,6 +133,11 @@ void BrowserGui::scanCwd() {
                         std::strncat(this->cwd, "/", sizeof(this->cwd) - 1);
                         this->scanCwd();
                         return true;
+                    } else if (down & HidNpadButton_ZR) {
+                        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
+                        config::set_load_path(path_buffer);
+                        m_frame->setToast("Set start up file", item->getText().c_str());
+                        return true;
                     }
                     return false;
                 });
@@ -146,6 +154,11 @@ void BrowserGui::scanCwd() {
                         } else {
                             m_frame->setToast("Failed to add Track.", "Does the name contain umlauts?");
                         }
+                        return true;
+                    } else if (down & HidNpadButton_ZR) {
+                        std::snprintf(path_buffer, sizeof(path_buffer), "%s%s", this->cwd, item->getText().c_str());
+                        config::set_load_path(path_buffer);
+                        m_frame->setToast("Set start up file", path_buffer);
                         return true;
                     }
                     return false;
@@ -215,12 +228,11 @@ void BrowserGui::addAllToPlaylist() {
     s64 count = 0;
     std::vector<FsDirectoryEntry> entries(64);
 
-    while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count){
+    while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
         for (s64 i = 0; i < count; i++) {
             const auto& entry = entries[i];
             if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
-                file_list.push_back(std::string(entry.name));
-                count++;
+                file_list.emplace_back(entry.name);
             }
         }
     }
