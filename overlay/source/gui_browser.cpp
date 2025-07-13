@@ -119,10 +119,15 @@ void BrowserGui::scanCwd() {
 
     /* Iternate over directory. */
     s64 count = 0;
+    const u64 max = 2048; // max items to be added to the array.
     std::vector<FsDirectoryEntry> entries(64);
 
     while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
         for (s64 i = 0; i < count; i++) {
+            if (folders.size() + files.size() >= max) {
+                break;
+            }
+
             const auto& entry = entries[i];
             if (entry.type == FsDirEntryType_Dir) {
                 /* Add directory entries. */
@@ -165,6 +170,11 @@ void BrowserGui::scanCwd() {
                 });
                 files.push_back(item);
             }
+        }
+
+        if (folders.size() + files.size() >= max) {
+            m_frame->setToast("Stopped scanning folder", "maximum of " + std::to_string(max) + " hit");
+            break;
         }
     }
     if (folders.size() == 0 && files.size() == 0) {
@@ -226,6 +236,7 @@ void BrowserGui::addAllToPlaylist() {
     std::vector<std::string> file_list;
     s64 songs_added = 0;
     s64 count = 0;
+    const u64 max = 512; // max set by PLAYLIST_ENTRY_MAX in music_player.cpp
     std::vector<FsDirectoryEntry> entries(64);
 
     while (R_SUCCEEDED(fsDirRead(&dir, &count, entries.size(), entries.data())) && count) {
@@ -233,7 +244,15 @@ void BrowserGui::addAllToPlaylist() {
             const auto& entry = entries[i];
             if (entry.type == FsDirEntryType_File && SupportsType(entry.name)){
                 file_list.emplace_back(entry.name);
+
+                if (file_list.size() >= max) {
+                    break;
+                }
             }
+        }
+
+        if (file_list.size() >= max) {
+            break;
         }
     }
 
