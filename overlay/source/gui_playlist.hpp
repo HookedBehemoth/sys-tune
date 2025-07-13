@@ -10,4 +10,5 @@ class PlaylistGui final : public tsl::Gui {
     PlaylistGui();
 
     tsl::elm::Element *createUI() override;
+    void update() override;
 };
