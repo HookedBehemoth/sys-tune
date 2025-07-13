@@ -34,4 +34,8 @@ void set_title_volume(u64 tid, float value);
 auto get_default_title_volume() -> float;
 void set_default_title_volume(float value);
 
+// returns the length of the string
+auto get_load_path(char* out, int max_len) -> int;
+void set_load_path(const char* path);
+
 }

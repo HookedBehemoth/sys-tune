@@ -4,6 +4,13 @@
 #include <memory>
 #include "resamplers/SDL_audioEX.h"
 
+enum class SourceType {
+    NONE,
+    MP3,
+    FLAC,
+    WAV,
+};
+
 class Source {
   private:
     FsFile m_file = {};
@@ -54,3 +61,4 @@ class Source {
 };
 
 std::unique_ptr<Source> OpenFile(const char *path);
+SourceType GetSourceType(const char* path);

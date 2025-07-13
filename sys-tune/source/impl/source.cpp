@@ -3,7 +3,6 @@
 #include "sdmc/sdmc.hpp"
 
 #include <cstring>
-#include <strings.h>
 
 // NOTE: when updating dr_libs, check for TUNE-FIX comment for patches.
 #define DR_FLAC_IMPLEMENTATION
@@ -344,8 +343,8 @@ class WavFile final : public Source {
 };
 
 std::unique_ptr<Source> OpenFile(const char *path) {
-    const auto length = std::strlen(path);
-    if (length < 5)
+    const auto type = GetSourceType(path);
+    if (type == SourceType::NONE)
         return nullptr;
 
     FsFile file;
@@ -355,17 +354,17 @@ std::unique_ptr<Source> OpenFile(const char *path) {
 
     if (false) {}
 #ifdef WANT_MP3
-    else if (strcasecmp(path + length - 4, ".mp3") == 0) {
+    else if (type == SourceType::MP3) {
         return std::make_unique<Mp3File>(std::move(file));
     }
 #endif
 #ifdef WANT_FLAC
-    else if (strcasecmp(path + length - 5, ".flac") == 0) {
+    else if (type == SourceType::FLAC) {
         return std::make_unique<FlacFile>(std::move(file));
     }
 #endif
 #ifdef WANT_WAV
-    else if (strcasecmp(path + length - 4, ".wav") == 0 || strcasecmp(path + length - 5, ".wave") == 0) {
+    else if (type == SourceType::WAV) {
         return std::make_unique<WavFile>(std::move(file));
     }
 #endif
@@ -373,4 +372,21 @@ std::unique_ptr<Source> OpenFile(const char *path) {
         fsFileClose(&file);
         return nullptr;
     }
+}
+
+SourceType GetSourceType(const char* path) {
+    const auto ext = std::strrchr(path, '.');
+    if (!ext) {
+        return SourceType::NONE;
+    }
+
+    if (!strcasecmp(ext, ".mp3")) {
+        return SourceType::MP3;
+    } else if (!strcasecmp(ext, ".flac")) {
+        return SourceType::FLAC;
+    } else if (!strcasecmp(ext, ".wav") || !strcasecmp(ext, ".wave")) {
+        return SourceType::WAV;
+    }
+
+    return SourceType::NONE;
 }

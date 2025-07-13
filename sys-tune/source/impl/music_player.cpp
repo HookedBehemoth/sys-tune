@@ -309,6 +309,42 @@ namespace tune::impl {
     }
 
     void TuneThreadFunc(void *) {
+        {
+            char load_path[512];
+            if (config::get_load_path(load_path, sizeof(load_path))) {
+                // check if the path is a file or folder.
+                FsDirEntryType type;
+                if (R_SUCCEEDED(sdmc::GetType(load_path, &type))) {
+                    if (type == FsDirEntryType_File) {
+                        // path is a file, load single entry.
+                        if (GetSourceType(load_path) != SourceType::NONE) {
+                            Enqueue(load_path, std::strlen(load_path), EnqueueType::Back);
+                        }
+                    } else {
+                        // path is a folder, load all entries.
+                        FsDir dir;
+                        if (R_SUCCEEDED(sdmc::OpenDir(&dir, load_path, FsDirOpenMode_ReadFiles|FsDirOpenMode_NoFileSize))) {
+                            // during init, we have a lot of memory to work with.
+                            std::vector<FsDirectoryEntry> entries(std::min(64, PLAYLIST_ENTRY_MAX));
+
+                            s64 total;
+                            char full_path[512];
+                            while (R_SUCCEEDED(fsDirRead(&dir, &total, entries.size(), entries.data())) && total) {
+                                for (s64 i = 0; i < total; i++) {
+                                    if (GetSourceType(entries[i].name) != SourceType::NONE) {
+                                        std::snprintf(full_path, sizeof(full_path), "%s/%s", load_path, entries[i].name);
+                                        Enqueue(full_path, std::strlen(full_path), EnqueueType::Back);
+                                    }
+                                }
+                            }
+
+                            fsDirClose(&dir);
+                        }
+                    }
+                }
+            }
+        }
+
         /* Run as long as we aren't stopped and no error has been encountered. */
         while (g_should_run) {
             g_current.Reset();
@@ -583,6 +619,9 @@ namespace tune::impl {
     }
 
     Result Enqueue(const char *buffer, size_t buffer_length, EnqueueType type) {
+        if (GetSourceType(buffer) == SourceType::NONE)
+            return tune::InvalidPath;
+
         /* Ensure file exists. */
         if (!sdmc::FileExists(buffer))
             return tune::InvalidPath;

@@ -96,4 +96,13 @@ void set_default_title_volume(float value) {
     ini_putf("config", "global_volume", value, CONFIG_PATH);
 }
 
+auto get_load_path(char* out, int max_len) -> int {
+    return ini_gets("config", "load_path", "", out, max_len, CONFIG_PATH);
+}
+
+void set_load_path(const char* path) {
+    create_config_dir();
+    ini_puts("config", "load_path", path, CONFIG_PATH);
+}
+
 }
