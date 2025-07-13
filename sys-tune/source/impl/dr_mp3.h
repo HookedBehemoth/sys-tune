@@ -2294,12 +2294,16 @@ DRMP3_API void drmp3dec_init(drmp3dec *dec)
     dec->header[0] = 0;
 }
 
+static void _drmp3dec_free(void* ptr) {
+	free(*(void**)ptr);
+}
+
 DRMP3_API int drmp3dec_decode_frame(drmp3dec *dec, const drmp3_uint8 *mp3, int mp3_bytes, void *pcm, drmp3dec_frame_info *info)
 {
     int i = 0, igr, frame_size = 0, success = 1;
     const drmp3_uint8 *hdr;
     drmp3_bs bs_frame[1];
-    static drmp3dec_scratch scratch; // TUNE-FIX
+    __attribute__((cleanup(_drmp3dec_free))) drmp3dec_scratch* scratch = (drmp3dec_scratch*)malloc(sizeof(*scratch)); // TUNE-FIX
 
     if (mp3_bytes > 4 && dec->header[0] == 0xff && drmp3_hdr_compare(dec->header, mp3))
     {
@@ -2336,23 +2340,23 @@ DRMP3_API int drmp3dec_decode_frame(drmp3dec *dec, const drmp3_uint8 *mp3, int m
 
     if (info->layer == 3)
     {
-        int main_data_begin = drmp3_L3_read_side_info(bs_frame, scratch.gr_info, hdr);
+        int main_data_begin = drmp3_L3_read_side_info(bs_frame, scratch->gr_info, hdr);
         if (main_data_begin < 0 || bs_frame->pos > bs_frame->limit)
         {
             drmp3dec_init(dec);
             return 0;
         }
-        success = drmp3_L3_restore_reservoir(dec, bs_frame, &scratch, main_data_begin);
+        success = drmp3_L3_restore_reservoir(dec, bs_frame, scratch, main_data_begin);
         if (success && pcm != NULL)
         {
             for (igr = 0; igr < (DRMP3_HDR_TEST_MPEG1(hdr) ? 2 : 1); igr++, pcm = DRMP3_OFFSET_PTR(pcm, sizeof(drmp3d_sample_t)*576*info->channels))
             {
-                DRMP3_ZERO_MEMORY(scratch.grbuf[0], 576*2*sizeof(float));
-                drmp3_L3_decode(dec, &scratch, scratch.gr_info + igr*info->channels, info->channels);
-                drmp3d_synth_granule(dec->qmf_state, scratch.grbuf[0], 18, info->channels, (drmp3d_sample_t*)pcm, scratch.syn[0]);
+                DRMP3_ZERO_MEMORY(scratch->grbuf[0], 576*2*sizeof(float));
+                drmp3_L3_decode(dec, scratch, scratch->gr_info + igr*info->channels, info->channels);
+                drmp3d_synth_granule(dec->qmf_state, scratch->grbuf[0], 18, info->channels, (drmp3d_sample_t*)pcm, scratch->syn[0]);
             }
         }
-        drmp3_L3_save_reservoir(dec, &scratch);
+        drmp3_L3_save_reservoir(dec, scratch);
     } else
     {
 #ifdef DR_MP3_ONLY_MP3
@@ -2366,15 +2370,15 @@ DRMP3_API int drmp3dec_decode_frame(drmp3dec *dec, const drmp3_uint8 *mp3, int m
 
         drmp3_L12_read_scale_info(hdr, bs_frame, sci);
 
-        DRMP3_ZERO_MEMORY(scratch.grbuf[0], 576*2*sizeof(float));
+        DRMP3_ZERO_MEMORY(scratch->grbuf[0], 576*2*sizeof(float));
         for (i = 0, igr = 0; igr < 3; igr++)
         {
-            if (12 == (i += drmp3_L12_dequantize_granule(scratch.grbuf[0] + i, bs_frame, sci, info->layer | 1)))
+            if (12 == (i += drmp3_L12_dequantize_granule(scratch->grbuf[0] + i, bs_frame, sci, info->layer | 1)))
             {
                 i = 0;
-                drmp3_L12_apply_scf_384(sci, sci->scf + igr, scratch.grbuf[0]);
-                drmp3d_synth_granule(dec->qmf_state, scratch.grbuf[0], 12, info->channels, (drmp3d_sample_t*)pcm, scratch.syn[0]);
-                DRMP3_ZERO_MEMORY(scratch.grbuf[0], 576*2*sizeof(float));
+                drmp3_L12_apply_scf_384(sci, sci->scf + igr, scratch->grbuf[0]);
+                drmp3d_synth_granule(dec->qmf_state, scratch->grbuf[0], 12, info->channels, (drmp3d_sample_t*)pcm, scratch->syn[0]);
+                DRMP3_ZERO_MEMORY(scratch->grbuf[0], 576*2*sizeof(float));
                 pcm = DRMP3_OFFSET_PTR(pcm, sizeof(drmp3d_sample_t)*384*info->channels);
             }
             if (bs_frame->pos > bs_frame->limit)

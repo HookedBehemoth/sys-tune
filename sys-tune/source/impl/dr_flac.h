@@ -7870,10 +7870,13 @@ static void drflac__init_from_info(drflac* pFlac, const drflac_init_info* pInit)
     pFlac->container               = pInit->container;
 }
 
+static void _drflac_free(void* ptr) {
+	free(*(void**)ptr);
+}
 
 static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac_seek_proc onSeek, drflac_tell_proc onTell, drflac_meta_proc onMeta, drflac_container container, void* pUserData, void* pUserDataMD, const drflac_allocation_callbacks* pAllocationCallbacks)
 {
-    static drflac_init_info init; // TUNE-FIX
+    __attribute__((cleanup(_drflac_free))) drflac_init_info* init = (drflac_init_info*)malloc(sizeof(*init)); // TUNE-FIX
     drflac_uint32 allocationSize;
     drflac_uint32 wholeSIMDVectorCountPerChannel;
     drflac_uint32 decodedSamplesAllocationSize;
@@ -7889,7 +7892,7 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
     /* CPU support first. */
     drflac__init_cpu_caps();
 
-    if (!drflac__init_private(&init, onRead, onSeek, onTell, onMeta, container, pUserData, pUserDataMD)) {
+    if (!drflac__init_private(init, onRead, onSeek, onTell, onMeta, container, pUserData, pUserDataMD)) {
         return NULL;
     }
 
@@ -7921,20 +7924,20 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
     The allocation size for decoded frames depends on the number of 32-bit integers that fit inside the largest SIMD vector
     we are supporting.
     */
-    if ((init.maxBlockSizeInPCMFrames % (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32))) == 0) {
-        wholeSIMDVectorCountPerChannel = (init.maxBlockSizeInPCMFrames / (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32)));
+    if ((init->maxBlockSizeInPCMFrames % (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32))) == 0) {
+        wholeSIMDVectorCountPerChannel = (init->maxBlockSizeInPCMFrames / (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32)));
     } else {
-        wholeSIMDVectorCountPerChannel = (init.maxBlockSizeInPCMFrames / (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32))) + 1;
+        wholeSIMDVectorCountPerChannel = (init->maxBlockSizeInPCMFrames / (DRFLAC_MAX_SIMD_VECTOR_SIZE / sizeof(drflac_int32))) + 1;
     }
 
-    decodedSamplesAllocationSize = wholeSIMDVectorCountPerChannel * DRFLAC_MAX_SIMD_VECTOR_SIZE * init.channels;
+    decodedSamplesAllocationSize = wholeSIMDVectorCountPerChannel * DRFLAC_MAX_SIMD_VECTOR_SIZE * init->channels;
 
     allocationSize += decodedSamplesAllocationSize;
     allocationSize += DRFLAC_MAX_SIMD_VECTOR_SIZE;  /* Allocate extra bytes to ensure we have enough for alignment. */
 
 #ifndef DR_FLAC_NO_OGG
     /* There's additional data required for Ogg streams. */
-    if (init.container == drflac_container_ogg) {
+    if (init->container == drflac_container_ogg) {
         allocationSize += sizeof(drflac_oggbs);
 
         pOggbs = (drflac_oggbs*)drflac__malloc_from_callbacks(sizeof(*pOggbs), &allocationCallbacks);
@@ -7947,10 +7950,10 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
         pOggbs->onSeek = onSeek;
         pOggbs->onTell = onTell;
         pOggbs->pUserData = pUserData;
-        pOggbs->currentBytePos = init.oggFirstBytePos;
-        pOggbs->firstBytePos = init.oggFirstBytePos;
-        pOggbs->serialNumber = init.oggSerial;
-        pOggbs->bosPageHeader = init.oggBosHeader;
+        pOggbs->currentBytePos = init->oggFirstBytePos;
+        pOggbs->firstBytePos = init->oggFirstBytePos;
+        pOggbs->serialNumber = init->oggSerial;
+        pOggbs->bosPageHeader = init->oggBosHeader;
         pOggbs->bytesRemainingInPage = 0;
     }
 #endif
@@ -7963,14 +7966,14 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
     firstFramePos  = 42;   /* <-- We know we are at byte 42 at this point. */
     seektablePos   = 0;
     seekpointCount = 0;
-    if (init.hasMetadataBlocks) {
+    if (init->hasMetadataBlocks) {
         drflac_read_proc onReadOverride = onRead;
         drflac_seek_proc onSeekOverride = onSeek;
         drflac_tell_proc onTellOverride = onTell;
         void* pUserDataOverride = pUserData;
 
 #ifndef DR_FLAC_NO_OGG
-        if (init.container == drflac_container_ogg) {
+        if (init->container == drflac_container_ogg) {
             onReadOverride = drflac__on_read_ogg;
             onSeekOverride = drflac__on_seek_ogg;
             onTellOverride = drflac__on_tell_ogg;
@@ -7997,12 +8000,12 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
         return NULL;
     }
 
-    drflac__init_from_info(pFlac, &init);
+    drflac__init_from_info(pFlac, init);
     pFlac->allocationCallbacks = allocationCallbacks;
     pFlac->pDecodedSamples = (drflac_int32*)drflac_align((size_t)pFlac->pExtraData, DRFLAC_MAX_SIMD_VECTOR_SIZE);
 
 #ifndef DR_FLAC_NO_OGG
-    if (init.container == drflac_container_ogg) {
+    if (init->container == drflac_container_ogg) {
         drflac_oggbs* pInternalOggbs = (drflac_oggbs*)((drflac_uint8*)pFlac->pDecodedSamples + decodedSamplesAllocationSize + (seekpointCount * sizeof(drflac_seekpoint)));
         DRFLAC_COPY_MEMORY(pInternalOggbs, pOggbs, sizeof(*pOggbs));
 
@@ -8023,7 +8026,7 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
 
     /* NOTE: Seektables are not currently compatible with Ogg encapsulation (Ogg has its own accelerated seeking system). I may change this later, so I'm leaving this here for now. */
 #ifndef DR_FLAC_NO_OGG
-    if (init.container == drflac_container_ogg)
+    if (init->container == drflac_container_ogg)
     {
         pFlac->pSeekpoints = NULL;
         pFlac->seekpointCount = 0;
@@ -8075,8 +8078,8 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
     If we get here, but don't have a STREAMINFO block, it means we've opened the stream in relaxed mode and need to decode
     the first frame.
     */
-    if (!init.hasStreamInfoBlock) {
-        pFlac->currentFLACFrame.header = init.firstFrameHeader;
+    if (!init->hasStreamInfoBlock) {
+        pFlac->currentFLACFrame.header = init->firstFrameHeader;
         for (;;) {
             drflac_result result = drflac__decode_flac_frame(pFlac);
             if (result == DRFLAC_SUCCESS) {
