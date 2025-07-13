@@ -13,7 +13,7 @@ u32 __nx_fs_num_sessions = 1;
 // TODO(TJ): calculate minimum heap
 // TODO(TJ): calculate reasonable amount of heap for playlist entries.
 void __libnx_initheap(void) {
-    static char inner_heap[1024 * 200];
+    static char inner_heap[1024 * 300];
     extern char *fake_heap_start;
     extern char *fake_heap_end;
 
