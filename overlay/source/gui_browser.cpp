@@ -159,17 +159,29 @@ void BrowserGui::scanCwd() {
         return;
     }
 
+    tsl::elm::ListItem* focus_elm = nullptr;
+
     if (folders.size() > 0) {
         std::sort(folders.begin(), folders.end(), ListItemTextCompare);
+
+        focus_elm = folders[0];
+
         for (auto element : folders)
             this->m_list->addItem(element);
     }
     if (files.size() > 0) {
         this->m_list->addItem(new tsl::elm::CategoryHeader("Files"));
         std::sort(files.begin(), files.end(), ListItemTextCompare);
+
+        if (!focus_elm)
+            focus_elm = files[0];
+
         for (auto element : files)
             this->m_list->addItem(element);
     }
+
+    if (focus_elm)
+        tsl::Gui::requestFocus(focus_elm, tsl::FocusDirection::None);
 }
 
 void BrowserGui::upCwd() {
