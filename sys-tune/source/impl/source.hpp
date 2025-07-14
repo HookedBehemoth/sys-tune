@@ -30,19 +30,30 @@ class Source {
     template<auto func>
     using Deleter = FunctionCaller<func>;
 
+    template<size_t Size>
+    struct BufferedFileData {
+        u8 data[Size];
+        s64 off;
+        s64 size;
+  };
+
   protected:
-    std::array<s16, 512> m_resample_buffer;
+    // increasing the size of this buffer also increases the memory used by the resampler.
+    static inline std::array<s16, 1024 * 4> m_resample_buffer;
+    // increasing this reduces io calls.
+    static inline BufferedFileData<1024 * 64> m_buffered;
     LockableMutex m_mutex;
 
   private:
     using UniqueAudioStream = std::unique_ptr<SDL_AudioStream, Deleter<&SDL_FreeAudioStreamEX>>;
     UniqueAudioStream m_sdl_stream{nullptr};
+    bool m_native_stream{};
 
   public:
     Source(FsFile &&file);
     virtual ~Source();
 
-    bool SetupResampler(u32 output_channels, u32 output_sample_rate);
+    bool SetupResampler(int output_channels, int output_sample_rate);
     s64 Resample(u8* out, std::size_t size);
 
     size_t ReadFile(void *buffer, size_t read_size);

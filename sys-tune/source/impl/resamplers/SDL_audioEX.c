@@ -39,7 +39,7 @@ static int SDL_PrintError(const char* e) { (void)e;  return -1; }
 /* Functions and variables exported from SDL_audio.c for SDL_sysaudio.c */
 
 /* Choose the audio filter functions below */
-void SDL_ChooseAudioConverters(void);
+static void SDL_ChooseAudioConverters(void);
 
 /* You need to call SDL_PrepareResampleFilter() before using the internal resampler. */
 static int SDL_PrepareResampleFilter(void);
@@ -1464,14 +1464,12 @@ void SDL_ChooseAudioConverters(void)
 struct SDL_DataQueue;
 typedef struct SDL_DataQueue SDL_DataQueue;
 
-SDL_DataQueue *SDL_NewDataQueue(const size_t packetlen, const size_t initialslack);
-void SDL_FreeDataQueue(SDL_DataQueue *queue);
-void SDL_ClearDataQueue(SDL_DataQueue *queue, const size_t slack);
-int SDL_WriteToDataQueue(SDL_DataQueue *queue, const void *data, const size_t len);
-size_t SDL_ReadFromDataQueue(SDL_DataQueue *queue, void *buf, const size_t len);
-size_t SDL_PeekIntoDataQueue(SDL_DataQueue *queue, void *buf, const size_t len);
-size_t SDL_CountDataQueue(SDL_DataQueue *queue);
-void *SDL_ReserveSpaceInDataQueue(SDL_DataQueue *queue, const size_t len);
+static SDL_DataQueue *SDL_NewDataQueue(const size_t packetlen, const size_t initialslack);
+static void SDL_FreeDataQueue(SDL_DataQueue *queue);
+static void SDL_ClearDataQueue(SDL_DataQueue *queue, const size_t slack);
+static int SDL_WriteToDataQueue(SDL_DataQueue *queue, const void *data, const size_t len);
+static size_t SDL_ReadFromDataQueue(SDL_DataQueue *queue, void *buf, const size_t len);
+static size_t SDL_CountDataQueue(SDL_DataQueue *queue);
 
 typedef struct SDL_DataQueuePacket
 {
@@ -1675,31 +1673,6 @@ SDL_WriteToDataQueue(SDL_DataQueue *queue, const void *_data, const size_t _len)
 }
 
 size_t
-SDL_PeekIntoDataQueue(SDL_DataQueue *queue, void *_buf, const size_t _len)
-{
-    size_t len = _len;
-    uint8_t *buf = (uint8_t *) _buf;
-    uint8_t *ptr = buf;
-    SDL_DataQueuePacket *packet;
-
-    if (!queue) {
-        return 0;
-    }
-
-    for (packet = queue->head; len && packet; packet = packet->next) {
-        const size_t avail = packet->datalen - packet->startpos;
-        const size_t cpy = SDL_minEX(len, avail);
-        assert(queue->queued_bytes >= avail);
-
-        memcpy(ptr, packet->data + packet->startpos, cpy);
-        ptr += cpy;
-        len -= cpy;
-    }
-
-    return (size_t) (ptr - buf);
-}
-
-size_t
 SDL_ReadFromDataQueue(SDL_DataQueue *queue, void *_buf, const size_t _len)
 {
     size_t len = _len;
@@ -1743,45 +1716,6 @@ size_t
 SDL_CountDataQueue(SDL_DataQueue *queue)
 {
     return queue ? queue->queued_bytes : 0;
-}
-
-void *
-SDL_ReserveSpaceInDataQueue(SDL_DataQueue *queue, const size_t len)
-{
-    SDL_DataQueuePacket *packet;
-
-    if (!queue) {
-        SDL_PrintError("queue");
-        return NULL;
-    } else if (len == 0) {
-        SDL_PrintError("len");
-        return NULL;
-    } else if (len > queue->packet_size) {
-        SDL_PrintError("len is larger than packet size");
-        return NULL;
-    }
-
-    packet = queue->head;
-    if (packet) {
-        const size_t avail = queue->packet_size - packet->datalen;
-        if (len <= avail) {  /* we can use the space at end of this packet. */
-            void *retval = packet->data + packet->datalen;
-            packet->datalen += len;
-            queue->queued_bytes += len;
-            return retval;
-        }
-    }
-
-    /* Need a fresh packet. */
-    packet = AllocateDataQueuePacket(queue);
-    if (!packet) {
-        SDL_OutOfMemoryEX();
-        return NULL;
-    }
-
-    packet->datalen = len;
-    queue->queued_bytes += len;
-    return packet->data;
 }
 
 // AUDIOCVT
