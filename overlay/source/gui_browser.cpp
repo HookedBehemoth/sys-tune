@@ -240,7 +240,7 @@ void BrowserGui::addAllToPlaylist() {
     std::vector<std::string> file_list;
     s64 songs_added = 0;
     s64 count = 0;
-    const u64 max = 512; // max set by PLAYLIST_ENTRY_MAX in music_player.cpp
+    const u64 max = 300; // max set by PLAYLIST_ENTRY_MAX in music_player.cpp
     std::vector<FsDirectoryEntry> entries(64);
 
     // avoid vector allocs / resize in the loop.

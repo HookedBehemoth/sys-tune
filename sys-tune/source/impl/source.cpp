@@ -15,6 +15,7 @@
 #ifdef WANT_MP3
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
+#define DRMP3_DATA_CHUNK_SIZE DRMP3_MIN_DATA_CHUNK_SIZE
 #include "dr_mp3.h"
 #endif
 
@@ -65,10 +66,6 @@ namespace {
 
         *pCursor = data->TellFile();
         return true;
-    }
-
-    void Mp3MetaCallback(void *pUserData, const drmp3_metadata* pMetadata) {
-        // stubbed for now, will handle later to load album artwork.
     }
 #endif
 
@@ -134,6 +131,7 @@ namespace {
 
 Source::Source(FsFile &&file) : m_file(file), m_offset(0), m_size(0) {
     file = {};
+    m_buffered.off = m_buffered.size = 0;
     if (R_FAILED(fsFileGetSize(&this->m_file, &this->m_size)))
         this->m_size = 0;
 }
@@ -144,7 +142,13 @@ Source::~Source() {
     this->m_size   = 0;
 }
 
-bool Source::SetupResampler(u32 output_channels, u32 output_sample_rate) {
+bool Source::SetupResampler(int output_channels, int output_sample_rate) {
+    // check if we even need the resampler.
+    m_native_stream = GetChannelCount() == output_channels && GetSampleRate() == output_sample_rate;
+    if (m_native_stream) {
+        return true;
+    }
+
     m_sdl_stream = UniqueAudioStream{
         SDL_NewAudioStreamEX(
         AUDIO_S16, GetChannelCount(), GetSampleRate(),
@@ -159,34 +163,85 @@ s64 Source::Resample(u8* out, std::size_t size) {
         return -1;
     }
 
-    s64 data_read = 0;
-    while (size > 0) {
-        if (auto sz = SDL_AudioStreamGetEX(m_sdl_stream.get(), out, size); sz != 0) {
-            size -= sz;
-            out += sz;
-            data_read += sz;
-        } else {
-            const auto dec_got = Decode(m_resample_buffer.size(), m_resample_buffer.data());
-            if (dec_got == 0) {
-                return data_read;
-            }
-            if (0 != SDL_AudioStreamPutEX(m_sdl_stream.get(), m_resample_buffer.data(), dec_got)) {
+    if (m_native_stream) {
+        return Decode(size / sizeof(s16), (s16*)out);
+    } else {
+        s64 data_read = 0;
+        while (size > 0) {
+            const auto sz = SDL_AudioStreamGetEX(m_sdl_stream.get(), out, size);
+
+            if (sz < 0) {
                 return -1;
+            } else if (sz > 0) {
+                size -= sz;
+                out += sz;
+                data_read += sz;
+            } else {
+                const auto dec_got = Decode(m_resample_buffer.size(), m_resample_buffer.data());
+                if (dec_got == 0) {
+                    return data_read;
+                }
+                if (0 != SDL_AudioStreamPutEX(m_sdl_stream.get(), m_resample_buffer.data(), dec_got)) {
+                    return -1;
+                }
             }
+        }
+
+        return data_read;
+    }
+}
+
+size_t Source::ReadFile(void *_buffer, size_t read_size) {
+    auto dst = static_cast<u8*>(_buffer);
+    size_t amount = 0;
+
+    // check if we already have this data buffered.
+    if (m_buffered.size) {
+        // check if we can read this data into the beginning of dst.
+        if (this->m_offset < m_buffered.off + m_buffered.size && this->m_offset >= m_buffered.off) {
+            const auto off = this->m_offset - m_buffered.off;
+            const auto size = std::min<s64>(read_size, m_buffered.size - off);
+            std::memcpy(dst, m_buffered.data + off, size);
+
+            read_size -= size;
+            m_offset += size;
+            amount += size;
+            dst += size;
         }
     }
 
-    return data_read;
-}
+    if (read_size) {
+        u64 bytes_read = 0;
 
-size_t Source::ReadFile(void *buffer, size_t read_size) {
-    size_t bytes_read = 0;
-    if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, buffer, read_size, 0, &bytes_read))) {
-        this->m_offset += bytes_read;
-        return bytes_read;
-    } else {
-        return 0;
+        // if the dst dst is big enough, read data in place.
+        if (read_size >= sizeof(m_buffered.data)) {
+            if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, dst, read_size, 0, &bytes_read)) && bytes_read) {
+                read_size -= bytes_read;
+                m_offset += bytes_read;
+                amount += bytes_read;
+                dst += bytes_read;
+
+                // save the last chunk of data to the m_buffered io.
+                const auto max_advance = std::min(amount, sizeof(m_buffered.data));
+                m_buffered.off = m_offset - max_advance;
+                m_buffered.size = max_advance;
+                std::memcpy(m_buffered.data, dst - max_advance, max_advance);
+            }
+        } else if (R_SUCCEEDED(fsFileRead(&this->m_file, this->m_offset, m_buffered.data, sizeof(m_buffered.data), 0, &bytes_read)) && bytes_read) {
+            const auto max_advance = std::min(read_size, bytes_read);
+            std::memcpy(dst, m_buffered.data, max_advance);
+
+            m_buffered.off = m_offset;
+            m_buffered.size = bytes_read;
+
+            read_size -= max_advance;
+            m_offset += max_advance;
+            amount += max_advance;
+            dst += max_advance;
+        }
     }
+
+    return amount;
 }
 
 bool Source::SeekFile(s64 offset, int origin) {
@@ -205,7 +260,7 @@ bool Source::SeekFile(s64 offset, int origin) {
             return false;
     }
 
-    if (new_offset <= this->m_size) {
+    if (new_offset >= 0 && new_offset <= this->m_size) {
         this->m_offset = new_offset;
         return true;
     } else {
@@ -278,7 +333,7 @@ class Mp3File final : public Source {
 
   public:
     Mp3File(FsFile &&file) : Source(std::move(file)) {
-        if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, Mp3TellCallback, Mp3MetaCallback, this, mp3_alloc_ptr)) {
+        if (drmp3_init(&this->m_mp3, ReadCallback, Mp3SeekCallback, Mp3TellCallback, nullptr, this, mp3_alloc_ptr)) {
             this->m_total_frame_count = drmp3_get_pcm_frame_count(&this->m_mp3);
             this->initialized         = true;
         }

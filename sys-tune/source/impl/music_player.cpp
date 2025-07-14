@@ -16,7 +16,7 @@ namespace tune::impl {
 
     namespace {
         constexpr float VOLUME_MAX = 1.f;
-        constexpr auto PLAYLIST_ENTRY_MAX = 512; // 128k
+        constexpr auto PLAYLIST_ENTRY_MAX = 300; // 75k
         constexpr auto PATH_SIZE_MAX = 256;
 
         struct PlaylistID {
@@ -247,6 +247,9 @@ namespace tune::impl {
 
             g_source = source.get();
 
+            // for the first buffer, use very small buffer sizes to reduce latency between songs.
+            int first = 1;
+
             while (g_should_run && g_status == PlayerStatus::Playing) {
                 if (g_should_pause) {
                     svcSleepThread(17'000'000);
@@ -270,7 +273,13 @@ namespace tune::impl {
 
                 bool error = false;
                 if (buffer) {
-                    const auto nSamples = source->Resample((u8*)buffer->buffer, AUDIO_BUFFER_SIZE * sizeof(s16));
+                    auto buffer_size = AUDIO_BUFFER_SIZE * sizeof(s16);
+                    if (first) {
+                        first--;
+                        buffer_size = std::min(512 * sizeof(s16), buffer_size);
+                    }
+
+                    const auto nSamples = source->Resample((u8*)buffer->buffer, buffer_size);
                     if (nSamples <= 0) {
                         error = true;
                     } else {
@@ -343,12 +352,21 @@ namespace tune::impl {
 
                             s64 total;
                             char full_path[PATH_SIZE_MAX];
+                            Result rc = 0;
+
                             while (R_SUCCEEDED(fsDirRead(&dir, &total, entries.size(), entries.data())) && total) {
                                 for (s64 i = 0; i < total; i++) {
                                     if (GetSourceType(entries[i].name) != SourceType::NONE) {
                                         std::snprintf(full_path, sizeof(full_path), "%s/%s", load_path, entries[i].name);
-                                        Enqueue(full_path, std::strlen(full_path), EnqueueType::Back);
+                                        rc = Enqueue(full_path, std::strlen(full_path), EnqueueType::Back);
+                                        if (rc == tune::OutOfMemory) {
+                                            break;
+                                        }
                                     }
+                                }
+
+                                if (rc == tune::OutOfMemory) {
+                                    break;
                                 }
                             }
 
