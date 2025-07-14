@@ -96,6 +96,18 @@ namespace tune::impl {
                 return true;
             }
 
+            void Shuffle() {
+                const auto size = m_shuffle_playlist.size();
+                if (!size) {
+                    return;
+                }
+
+                for (auto& e : m_shuffle_playlist) {
+                    const auto index = randomGet64() % size;
+                    std::swap(e, m_shuffle_playlist[index]);
+                }
+            }
+
             const char* GetPath(u32 index, ShuffleMode shuffle) const {
                 return GetPath(Get(index, shuffle));
             }
@@ -563,6 +575,11 @@ namespace tune::impl {
 
     void SetShuffleMode(ShuffleMode mode) {
         std::scoped_lock lk(g_mutex);
+
+        // if we just enabled shuffle mode, re-shuffle the playlist.
+        if (g_shuffle == ShuffleMode::Off && mode == ShuffleMode::On) {
+            g_playlist.Shuffle();
+        }
 
         g_shuffle = mode;
     }
