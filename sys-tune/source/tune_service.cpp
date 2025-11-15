@@ -30,7 +30,7 @@ namespace tune {
         IpcServer g_server;
         bool running = true;
 
-        Result ServiceHandlerFunc(void *arg, const IpcServerRequest *r, u8 *out_data, size_t *out_dataSize) {
+        Result ServiceHandlerFunc(void *, const IpcServerRequest *r, u8 *out_data, size_t *out_dataSize) {
             switch (r->data.cmdId) {
                 case TuneIpcCmd_GetStatus:
                     GET_SINGLE(bool, impl::GetStatus);
@@ -128,6 +128,7 @@ namespace tune {
                             hipcGetBufferSize(r->hipc.data.send_buffers),
                             *(EnqueueType *)r->data.ptr);
                     }
+                    break;
 
                 case TuneIpcCmd_Remove:
                     SET_SINGLE(u32, impl::Remove);

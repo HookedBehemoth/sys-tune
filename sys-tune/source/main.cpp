@@ -58,7 +58,7 @@ namespace {
 
 }
 
-int main(int argc, char *argv[]) {
+int main(int, char *[]) {
     R_ABORT_UNLESS(tune::impl::Initialize());
 
     /* Get GPIO session for the headphone jack pad. */

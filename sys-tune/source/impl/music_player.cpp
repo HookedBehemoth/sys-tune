@@ -453,7 +453,7 @@ namespace tune::impl {
         }
     }
 
-    void PmdmntThreadFunc(void *ptr) {
+    void PmdmntThreadFunc(void *) {
         while (g_should_run) {
             u64 pid{}, new_tid{};
             if (pm::PollCurrentPidTid(&pid, &new_tid)) {
