@@ -1,4 +1,3 @@
-#include "aud.h"
 #include "audout.h"
 #include "aud_wrapper.h"
 #include <switch.h>
